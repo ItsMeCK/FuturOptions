@@ -15,6 +15,7 @@ def calculate_roi():
     
     results_dir = "ai_option_brain/results"
     leaderboard = []
+    all_trades_log = []
     
     print(f"💰 Generatng Nifty 50 Leaderboard (Stress Tested)...")
     print(f"   Capital: ₹{CAPITAL} (+SIP)")
@@ -54,18 +55,24 @@ def calculate_roi():
                 entry_iv = row['market_iv_proxy'] / 100
                 entry_time = i
                 
-                # Estimate Straddle Premium (Approx: 0.8 * S * IV * sqrt(T))
-                # T = 7 days (expiry week avg) = 7/365
-                t_expiry = 7/365
-                premium_paid = 0.8 * entry_price * entry_iv * np.sqrt(t_expiry)
+                # Black-Scholes Model
+                def black_scholes(S, K, T, r, sigma, option_type="call"):
+                    import scipy.stats as si
+                    d1 = (np.log(S / K) + (r + 0.5 * sigma ** 2) * T) / (sigma * np.sqrt(T))
+                    d2 = (np.log(S / K) + (r - 0.5 * sigma ** 2) * T) / (sigma * np.sqrt(T))
+                    if option_type == "call":
+                        return (S * si.norm.cdf(d1, 0.0, 1.0) - K * np.exp(-r * T) * si.norm.cdf(d2, 0.0, 1.0))
+                    if option_type == "put":
+                        return (K * np.exp(-r * T) * si.norm.cdf(-d2, 0.0, 1.0) - S * si.norm.cdf(-d1, 0.0, 1.0))
+                        
+                # Entry Price Calculation (Exact BS)
+                r = 0.07 # Risk Free Rate
+                t_expiry = 7/365 # 7 Days to expiry (Avg)
+                premium_paid = black_scholes(entry_price, entry_price, t_expiry, r, entry_iv, "call") + \
+                               black_scholes(entry_price, entry_price, t_expiry, r, entry_iv, "put")
                 
                 # Capital Injection Logic (User Request)
                 # Start 30k, +5k every month, Max 50k.
-                # Calculate month index from start of simulation (Jun 2025)
-                # entry_time is minute index.
-                # Jun 1 is index 0.
-                # 1 month ~= 30 * 375 = 11250 minutes
-                
                 month_idx = int(entry_time / 11250)
                 current_capital = min(50000, CAPITAL + (month_idx * 5000))
                 
@@ -87,23 +94,11 @@ def calculate_roi():
                     curr_price = curr_row['close']
                     curr_iv = curr_row['market_iv_proxy'] / 100 # Dynamic IV (Crucial for Vol Crush)
                     
-                    # Current Straddle Value (Approximation using Current IV)
-                    t_remaining = max(0, t_expiry - (j / (375*365))) # Days remaining in years
+                    # Current Straddle Value (Exact BS)
+                    t_remaining = max(0.0001, t_expiry - (j / (375*365))) # Days remaining in years
                     
-                    # New Premium Estimate using Black-Scholes approx with NEW IV
-                    # This accounts for Vega (IV changes) and Theta (Time decay)
-                    current_premium = 0.8 * curr_price * curr_iv * np.sqrt(t_remaining)
-                    
-                    intrinsic = abs(curr_price - entry_price)
-                    
-                    entry_time_value = premium_paid # At entry, intrinsic is 0 (ATM)
-                    
-                    pct_move = abs(curr_price - entry_price) / entry_price
-                    moneyness_decay = 1 / (1 + pct_move * 20) 
-                    
-                    current_time_value = entry_time_value * (curr_iv / entry_iv) * np.sqrt(t_remaining / t_expiry) * moneyness_decay
-                    
-                    current_premium = intrinsic + current_time_value
+                    current_premium = black_scholes(curr_price, entry_price, t_remaining, r, curr_iv, "call") + \
+                                      black_scholes(curr_price, entry_price, t_remaining, r, curr_iv, "put")
                     
                     pnl_per_share = current_premium - premium_paid
                     pnl_pct = pnl_per_share / premium_paid
@@ -124,6 +119,19 @@ def calculate_roi():
                      exit_pnl = pnl_per_share * lot
                      held_minutes = 1875
                 
+                # Log Trade
+                all_trades_log.append({
+                    "Symbol": symbol,
+                    "Entry Date": row['date'],
+                    "Entry Price": entry_price,
+                    "Exit Date": df.iloc[min(i + held_minutes, total_rows - 1)]['date'],
+                    "Exit Price": df.iloc[min(i + held_minutes, total_rows - 1)]['close'],
+                    "Duration (Mins)": held_minutes,
+                    "Cost": total_cost,
+                    "P&L (INR)": exit_pnl,
+                    "ROI (%)": (exit_pnl / total_cost) * 100 if total_cost > 0 else 0
+                })
+
                 trades.append(exit_pnl)
                 i += held_minutes
             else:
@@ -145,6 +153,11 @@ def calculate_roi():
         })
         
         print(f"   ✅ {symbol}: ROI {roi:.1f}% ({num_trades} trades)")
+
+    # Save Log
+    log_df = pd.DataFrame(all_trades_log)
+    log_df.to_csv("ai_option_brain/results/final_trades_log.csv", index=False)
+    print(f"💾 Trade Log saved to: ai_option_brain/results/final_trades_log.csv")
 
     # Save Leaderboard
     lb_df = pd.DataFrame(leaderboard)
