@@ -1,0 +1,14 @@
+yfinance
+pandas
+numpy
+ta
+backtrader
+matplotlib
+scipy
+openai
+requests
+python-dotenv
+kiteconnect
+py_vollib
+xgboost
+scikit-learn
