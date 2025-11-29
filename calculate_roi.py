@@ -86,6 +86,10 @@ def calculate_roi():
                 exit_pnl = 0
                 held_minutes = 0
                 
+                # Trailing Stop Variables
+                high_water_mark = 0
+                trailing_active = False
+                
                 for j in range(1, 1875): # Max 5 days
                     current_idx = i + j
                     if current_idx >= total_rows: break
@@ -103,16 +107,28 @@ def calculate_roi():
                     pnl_per_share = current_premium - premium_paid
                     pnl_pct = pnl_per_share / premium_paid
                     
-                    # Check Exits
-                    if pnl_pct >= TAKE_PROFIT_PCT:
-                        exit_pnl = pnl_per_share * lot
-                        held_minutes = j
-                        break # TAKE PROFIT
+                    # Update High Water Mark
+                    if pnl_pct > high_water_mark:
+                        high_water_mark = pnl_pct
                     
+                    # Check Exits
+                    
+                    # 1. Activate Trailing Stop if Profit > 20%
+                    if pnl_pct >= 0.20:
+                        trailing_active = True
+                        
+                    # 2. Trailing Stop Execution (Trail by 10%)
+                    if trailing_active:
+                        if pnl_pct <= (high_water_mark - 0.10):
+                            exit_pnl = pnl_per_share * lot
+                            held_minutes = j
+                            break # TRAILING STOP HIT
+                            
+                    # 3. Hard Stop Loss (Fixed at -15%)
                     if pnl_pct <= STOP_LOSS_PCT:
                         exit_pnl = pnl_per_share * lot
                         held_minutes = j
-                        break # STOP LOSS
+                        break # STOP LOSS HIT
                 
                 # If loop finishes without exit
                 if exit_pnl == 0:
