@@ -85,7 +85,7 @@ Description=Token Management UI
 After=network.target
 
 [Service]
-User=$USER
+User=root
 WorkingDirectory=$WD
 ExecStart=$WD/venv/bin/python3 token_manager.py
 Restart=always
