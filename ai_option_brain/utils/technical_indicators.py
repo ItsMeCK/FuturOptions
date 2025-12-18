@@ -36,10 +36,14 @@ class TechnicalIndicators:
                 return df['cum_vol_price'] / df['cum_vol']
 
             # Group by day for intraday VWAP
-            df['cum_vol'] = df.groupby('date_only')['volume'].cumsum()
-            df['cum_vol_price'] = df.groupby('date_only').apply(lambda x: (x['tp'] * x['volume']).cumsum()).reset_index(level=0, drop=True)
+            # Group by day for intraday VWAP
+            # Use transform to ensure index alignment matches original df
+            df['cum_vol'] = df.groupby('date_only')['volume'].transform('cumsum')
+            # Calculate PV (Price * Volume) first
+            df['pv'] = df['tp'] * df['volume']
+            df['cum_pv'] = df.groupby('date_only')['pv'].transform('cumsum')
             
-            return df['cum_vol_price'] / df['cum_vol']
+            return df['cum_pv'] / df['cum_vol']
             
         except Exception as e:
             print(f"Error calculating VWAP: {e}")
@@ -74,6 +78,13 @@ class TechnicalIndicators:
         """
         indicator = ta.volatility.BollingerBands(close=series, window=period, window_dev=std_dev)
         return indicator.bollinger_hband(), indicator.bollinger_lband()
+
+    @staticmethod
+    def calculate_adx(high, low, close, window=14):
+        """
+        Calculates Average Directional Index (ADX).
+        """
+        return ta.trend.adx(high, low, close, window=window)
 
     @staticmethod
     def resample_data(df, interval):

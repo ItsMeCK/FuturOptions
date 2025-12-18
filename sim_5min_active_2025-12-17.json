@@ -1,0 +1,18 @@
+{
+    "MARUTI": {
+        "symbol": "MARUTI",
+        "option_symbol": "MARUTI25DEC16400PE",
+        "underlying_price": 16389.0,
+        "entry_price": 183.8,
+        "entry_time": "2025-12-17 14:21:00",
+        "quantity": 100,
+        "lot_size": 100,
+        "strategy": "Sniper SHORT",
+        "status": "OPEN",
+        "pnl": -350.0,
+        "pnl_pct": -0.019042437431991292,
+        "high_water_mark": 0.026931447225244768,
+        "last_update": "2025-12-18 19:46:56.156091",
+        "current_price": 16385.0
+    }
+}

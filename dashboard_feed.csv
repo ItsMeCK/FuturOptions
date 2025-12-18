@@ -1,0 +1,12 @@
+Symbol,Score,Status,Signal,Price,Breakout,Breakdown,Edge,RVOL,VWAP,LLM Conf,Reason,Last Update
+ADANIENT,33.0,WAIT,NEUTRAL,2210.0,0.0,0.0,0%,1.4x,2238.2,100%,Score 33/100 (Threshold not met),14:15:00
+INDUSINDBK,50.0,FILTERED,NEUTRAL,837.6,0.0,0.0,2%,0.8x,851.9,100%,Low Vol (RVOL 0.75),14:15:00
+INFY,47.0,WAIT,NEUTRAL,1607.5,0.0,0.0,11%,2.6x,1620.8,100%,Score 47/100 (Threshold not met),14:15:00
+BEL,34.0,WAIT,NEUTRAL,386.85,0.0,0.0,0%,1.3x,394.1,100%,Score 34/100 (Threshold not met),14:15:00
+TATASTEEL,64.0,WAIT,NEUTRAL,163.74,0.0,0.0,6%,1.9x,165.7,100%,Score 64/100 (Threshold not met),14:15:00
+BAJAJFINSV,41.0,WAIT,NEUTRAL,2052.9,0.0,0.0,5%,3.4x,2072.7,100%,Score 41/100 (Threshold not met),14:15:00
+HINDUNILVR,48.0,WAIT,NEUTRAL,2304.9,0.0,0.0,9%,2.1x,2327.7,100%,Score 48/100 (Threshold not met),14:15:00
+HINDALCO,42.0,WAIT,NEUTRAL,821.5,0.0,0.0,0%,2.1x,826.6,100%,Score 42/100 (Threshold not met),14:15:00
+MARUTI,71.0,WAIT,NEUTRAL,16180.0,0.0,0.0,10%,1.8x,16169.2,100%,Mid-Range (No Setup),14:15:00
+BHARTIARTL,58.0,WAIT,NEUTRAL,2080.9,0.0,0.0,9%,3.2x,2094.0,100%,Score 58/100 (Threshold not met),14:15:00
+INDIA VIX,,LOW (Complacency),,0.0,,,,,,,Market Gauge,

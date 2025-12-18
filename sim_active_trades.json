@@ -1,0 +1,18 @@
+{
+    "HINDALCO": {
+        "symbol": "HINDALCO",
+        "option_symbol": "HINDALCO25DEC850PE",
+        "underlying_price": 847.35,
+        "entry_price": 14.75,
+        "entry_time": "2025-12-17 14:41:00",
+        "quantity": 1,
+        "lot_size": 1,
+        "strategy": "Sniper SHORT",
+        "status": "OPEN",
+        "pnl": -1.1999999999999993,
+        "pnl_pct": -0.08135593220338978,
+        "high_water_mark": 0.0,
+        "last_update": "2025-12-18 19:35:50.248003",
+        "current_price": 848.0
+    }
+}

@@ -1,8 +1,23 @@
+# Secrets
+.env
+deploy_package.zip
+
+# Python
 venv/
 __pycache__/
 *.pyc
+
+# Data & Logs (**IMPORTANT**)
+daily_data/
+logs/
+*.log
+active_trades.json
+latest_scan.json
+scan_status.json
+ai_option_brain/results/
+ai_option_brain/data/
+
+# IDE
+.vscode/
+.idea/
 .DS_Store
-.env
-data/
-ai_option_brain/data/raw/
-ai_option_brain/data/processed/
