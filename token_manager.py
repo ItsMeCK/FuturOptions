@@ -82,7 +82,7 @@ def restart_service():
         # Note: This requires the user running this script to have sudo rights for systemctl, 
         # or the service configured to allow restart without password.
         # We will assume sudo is needed and the user runs the script as root or via a properly configured service.
-        subprocess.run(["sudo", "systemctl", "restart", "brain"], check=True)
+        subprocess.run(["systemctl", "restart", "brain"], check=True)
         return True
     except Exception as e:
         logging.error(f"Error restarting service: {e}")
