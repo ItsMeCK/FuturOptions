@@ -47,45 +47,13 @@ HTML_TEMPLATE = """
 </html>
 """
 
-def update_env_file(new_token):
-    env_path = ".env"
+def write_token_file(new_token):
     try:
-        # Read existing lines
-        with open(env_path, "r") as f:
-            lines = f.readlines()
-            
-        # Update or Append
-        new_lines = []
-        found = False
-        for line in lines:
-            if line.startswith("ZERODHA_ACCESS_TOKEN="):
-                new_lines.append(f"ZERODHA_ACCESS_TOKEN={new_token}\n")
-                found = True
-            else:
-                new_lines.append(line)
-        
-        if not found:
-            new_lines.append(f"\nZERODHA_ACCESS_TOKEN={new_token}\n")
-            
-        # Write back
-        with open(env_path, "w") as f:
-            f.writelines(new_lines)
-            
+        with open("zerodha_hot_token.txt", "w") as f:
+            f.write(new_token.strip())
         return True
     except Exception as e:
-        logging.error(f"Error updating .env: {e}")
-        return False
-
-def restart_service():
-    try:
-        # Execute systemctl command
-        # Note: This requires the user running this script to have sudo rights for systemctl, 
-        # or the service configured to allow restart without password.
-        # We will assume sudo is needed and the user runs the script as root or via a properly configured service.
-        subprocess.run(["systemctl", "restart", "brain"], check=True)
-        return True
-    except Exception as e:
-        logging.error(f"Error restarting service: {e}")
+        logging.error(f"Error writing token file: {e}")
         return False
 
 @app.route("/", methods=["GET", "POST"])
@@ -100,15 +68,13 @@ def home():
         if not token:
              return render_template_string(HTML_TEMPLATE, message="❌ Token cannot be empty!", status="error")
         
-        # 1. Update .env
-        if update_env_file(token):
-            # 2. Restart Service
-            if restart_service():
-                return render_template_string(HTML_TEMPLATE, message="✅ Success! Token updated & Bot restarting...", status="success")
-            else:
-                 return render_template_string(HTML_TEMPLATE, message="⚠️ Token updated, but Service Restart failed. Check logs.", status="error")
+        # Hot Reload Write
+        if write_token_file(token):
+             return render_template_string(HTML_TEMPLATE, message="✅ Token Saved! Brain will update in ~60s.", status="success")
         else:
-            return render_template_string(HTML_TEMPLATE, message="❌ Failed to write to .env file.", status="error")
+            return render_template_string(HTML_TEMPLATE, message="❌ Failed to write token file.", status="error")
+
+    return render_template_string(HTML_TEMPLATE, message="", status="")
 
     return render_template_string(HTML_TEMPLATE, message="", status="")
 

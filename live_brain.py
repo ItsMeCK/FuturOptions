@@ -251,6 +251,7 @@ class LiveBrain:
                     continue
                 
                 # Market Open
+                self.check_hot_reload()
                 self.scan_market()
                 time.sleep(60)
                     
@@ -260,6 +261,33 @@ class LiveBrain:
             except Exception as e:
                 logging.error(f"🔥 Critical Error in Main Loop: {e}")
                 time.sleep(10)
+
+    def check_hot_reload(self):
+        """Check for fresh token in hot file and reload if found."""
+        hot_file = "zerodha_hot_token.txt"
+        if os.path.exists(hot_file):
+            try:
+                with open(hot_file, "r") as f:
+                    new_token = f.read().strip()
+                    
+                if new_token and new_token != self.access_token:
+                    logging.info(f"🔄 Hot Reload Detected! Updating Token...")
+                    
+                    # Update Internal State
+                    self.access_token = new_token
+                    
+                    # Re-Initialize Fetcher & Brain
+                    self.fetcher = ZerodhaDataFetcher(access_token=self.access_token)
+                    self.options_brain = OptionsBrain(self.fetcher)
+                    
+                    logging.info("✅ Hot Reload Complete. New Token Active.")
+                    
+                    # Optional: Update .env for persistence?
+                    # Ideally yes, but we lack perms? 
+                    # Actually brain runs as user, so it might have perms to write .env?
+                    # Let's skip tricky .env writes for now to be safe. File is enough.
+            except Exception as e:
+                logging.error(f"⚠️ Hot Reload Failed: {e}")
 
     def scan_market(self):
         """Single iteration of the scanning logic."""
