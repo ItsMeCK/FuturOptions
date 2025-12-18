@@ -10,3 +10,4 @@ openai
 scipy
 ta
 duckduckgo-search
+flask

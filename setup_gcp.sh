@@ -73,6 +73,24 @@ ExecStart=$WD/venv/bin/python3 notification_scheduler.py
 Restart=always
 EnvironmentFile=$WD/.env
 
+
+[Install]
+WantedBy=multi-user.target
+EOL"
+
+# Write Token UI Service
+sudo bash -c "cat > /etc/systemd/system/token_ui.service <<EOL
+[Unit]
+Description=Token Management UI
+After=network.target
+
+[Service]
+User=$USER
+WorkingDirectory=$WD
+ExecStart=$WD/venv/bin/python3 token_manager.py
+Restart=always
+EnvironmentFile=$WD/.env
+
 [Install]
 WantedBy=multi-user.target
 EOL"
@@ -85,5 +103,5 @@ echo -e "   Command: nano .env"
 echo -e "   (Paste your tokens there)"
 echo -e ""
 echo -e "👉 Step 2: Start the bots"
-echo -e "   Command: sudo systemctl enable --now brain scheduler"
+echo -e "   Command: sudo systemctl enable --now brain scheduler token_ui"
 echo -e "---------------------------------------------------"
