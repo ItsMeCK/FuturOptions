@@ -11,3 +11,4 @@ scipy
 ta
 duckduckgo-search
 flask
+pytz

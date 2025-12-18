@@ -214,14 +214,24 @@ class LiveBrain:
     def run(self):
         logging.info("🚀 Sniper Engine STARTED.")
         
+        # Define Timezone
+        try:
+            import pytz
+            ist = pytz.timezone('Asia/Kolkata')
+        except ImportError:
+            logging.error("pytz not found. Using system time.")
+            ist = None
+        
         while self.running:
             try:
                 self.heartbeat() # Pulse check
                 
                 # --- MARKET HOURS CHECK (IST) ---
-                # Server time might be UTC, so we strictly use IST offset if needed, 
-                # but assuming server is configured to IST via setup script.
-                now = datetime.now()
+                if ist:
+                    now = datetime.now(ist)
+                else:
+                    now = datetime.now() # Fallback
+                    
                 current_time = now.time()
                 
                 start_time = datetime.strptime("09:00", "%H:%M").time()
@@ -233,8 +243,10 @@ class LiveBrain:
                     continue
                     
                 # Market Closed Logic
-                if current_time < start_time or current_time > end_time:
-                    logging.info(f"🌙 Market Closed (Time: {current_time.strftime('%H:%M')}). Sleeping...")
+                market_open = start_time <= current_time <= end_time
+                
+                if not market_open:
+                    logging.info(f"🌙 Market Closed (IST: {current_time.strftime('%H:%M:%S')}). Sleeping...")
                     time.sleep(300) # Sleep 5 Minutes
                     continue
                 
