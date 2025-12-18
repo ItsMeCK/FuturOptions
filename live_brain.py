@@ -217,11 +217,30 @@ class LiveBrain:
         while self.running:
             try:
                 self.heartbeat() # Pulse check
-                self.scan_market()
                 
-                # Sleep if not in simulation
-                if not hasattr(self, 'simulation_time'):
-                    time.sleep(60)
+                # --- MARKET HOURS CHECK (IST) ---
+                # Server time might be UTC, so we strictly use IST offset if needed, 
+                # but assuming server is configured to IST via setup script.
+                now = datetime.now()
+                current_time = now.time()
+                
+                start_time = datetime.strptime("09:00", "%H:%M").time()
+                end_time = datetime.strptime("15:30", "%H:%M").time()
+                
+                # Simulation Mode Bypass
+                if hasattr(self, 'simulation_time'):
+                    self.scan_market()
+                    continue
+                    
+                # Market Closed Logic
+                if current_time < start_time or current_time > end_time:
+                    logging.info(f"🌙 Market Closed (Time: {current_time.strftime('%H:%M')}). Sleeping...")
+                    time.sleep(300) # Sleep 5 Minutes
+                    continue
+                
+                # Market Open
+                self.scan_market()
+                time.sleep(60)
                     
             except KeyboardInterrupt:
                 logging.info("🛑 Brain Stopped.")
