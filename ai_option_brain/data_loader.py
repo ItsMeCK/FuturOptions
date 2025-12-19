@@ -24,6 +24,7 @@ class ZerodhaDataFetcher:
         if self.api_key and self.access_token:
             self.kite = KiteConnect(api_key=self.api_key)
             self.kite.set_access_token(self.access_token)
+            logging.info(f"🔌 Zerodha Client Init: API_KEY={self.api_key[:4]}... TOKEN={self.access_token[:4]}...")
         else:
             print("⚠️ Zerodha API Key/Token not found. Live data fetching will fail.")
             self.kite = None

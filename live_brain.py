@@ -275,7 +275,7 @@ class LiveBrain:
                 current_masked = f"{self.access_token[:6]}...{self.access_token[-4:]}" if self.access_token else "None"
                 new_masked = f"{new_token[:6]}...{new_token[-4:]}" if new_token else "Empty"
                 
-                # logging.info(f"🔎 Hot Reload Check: Current={current_masked} New={new_masked}")
+                logging.info(f"🔎 Hot Reload Check: Current={current_masked} New={new_masked}")
                 
                 if new_token and new_token != self.access_token:
                     logging.info(f"🔄 Hot Reload Triggered! Updating Token...")
