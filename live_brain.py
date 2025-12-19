@@ -264,7 +264,7 @@ class LiveBrain:
                 end_time = datetime.strptime("15:30", "%H:%M").time()
                 
                 # Simulation Mode Bypass
-                if hasattr(self, 'simulation_time'):
+                if getattr(self, 'simulation_time', None):
                     self.scan_market()
                     continue
                     
