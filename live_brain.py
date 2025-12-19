@@ -265,13 +265,22 @@ class LiveBrain:
     def check_hot_reload(self):
         """Check for fresh token in hot file and reload if found."""
         hot_file = "zerodha_hot_token.txt"
+        
         if os.path.exists(hot_file):
             try:
                 with open(hot_file, "r") as f:
                     new_token = f.read().strip()
-                    
+                
+                # Debug Logging (Masked)
+                current_masked = f"{self.access_token[:6]}...{self.access_token[-4:]}" if self.access_token else "None"
+                new_masked = f"{new_token[:6]}...{new_token[-4:]}" if new_token else "Empty"
+                
+                # logging.info(f"🔎 Hot Reload Check: Current={current_masked} New={new_masked}")
+                
                 if new_token and new_token != self.access_token:
-                    logging.info(f"🔄 Hot Reload Detected! Updating Token...")
+                    logging.info(f"🔄 Hot Reload Triggered! Updating Token...")
+                    logging.info(f"   Old: {current_masked}")
+                    logging.info(f"   New: {new_masked}")
                     
                     # Update Internal State
                     self.access_token = new_token
@@ -280,14 +289,21 @@ class LiveBrain:
                     self.fetcher = ZerodhaDataFetcher(access_token=self.access_token)
                     self.options_brain = OptionsBrain(self.fetcher)
                     
+                    # Verify Fetcher
+                    if self.fetcher.kite:
+                         logging.info(f"   ✅ Fetcher Re-initialized with Token: {self.fetcher.access_token[:6]}...")
+                    else:
+                         logging.error("   ❌ Fetcher Init Failed (Kite object is None)")
+                    
                     logging.info("✅ Hot Reload Complete. New Token Active.")
                     
-                    # Optional: Update .env for persistence?
-                    # Ideally yes, but we lack perms? 
-                    # Actually brain runs as user, so it might have perms to write .env?
-                    # Let's skip tricky .env writes for now to be safe. File is enough.
+                    # Clear the file to prevent repeated re-init (optional, but good practice to avoid file IO every loop if logic is buggy)
+                    # Actually, we rely on equality check (new != current). So keeping file is fine.
+                    
             except Exception as e:
                 logging.error(f"⚠️ Hot Reload Failed: {e}")
+        else:
+             logging.warning(f"⚠️ Hot Token File Not Found: {os.path.abspath(hot_file)}")
 
     def scan_market(self):
         """Single iteration of the scanning logic."""
