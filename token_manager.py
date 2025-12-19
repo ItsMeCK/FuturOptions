@@ -253,7 +253,12 @@ def home():
 
 @app.route("/api/scan")
 def get_scan():
-    return jsonify(load_json_safe("latest_scan.json"))
+    # Switch to scan_status.json which is more reliable
+    data = load_json_safe("scan_status.json")
+    # Wrap in expected format if it's a list (since scan_status.json is orient='records')
+    if isinstance(data, list):
+         return jsonify({"top_picks": data, "timestamp": "Live"})
+    return jsonify(data)
 
 @app.route("/api/trades")
 def get_trades():
