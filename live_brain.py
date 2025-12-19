@@ -72,6 +72,13 @@ class LiveBrain:
             self.fetcher = ZerodhaDataFetcher() # Will likely fail or be empty
             self.options_brain = OptionsBrain(self.fetcher)
 
+        self.top_20 = self.load_top_20()
+        self.models = self.load_models()
+        self.history = defaultdict(ScoreHistory) # Symbol -> ScoreHistory
+        self.running = True
+        self.simulation_time = None
+        self.last_processed_candle = {} # Track last processed candle timestamp per symbol
+
     def load_initial_token(self):
         """Load token with priority: File > Env."""
         hot_file = "zerodha_hot_token.txt"
