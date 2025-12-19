@@ -806,6 +806,8 @@ class LiveBrain:
                          "top_picks": scan_results
                      }, f)
                  os.replace(temp_file, "latest_scan.json")
+                 os.chmod("latest_scan.json", 0o666)
+                 logging.info("✅ Saved latest_scan.json successfully.")
              else:
                  logging.warning("⚠️ Scan Results Empty. Skipping JSON write.")
 
