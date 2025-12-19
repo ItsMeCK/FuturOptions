@@ -460,8 +460,49 @@ class LiveBrain:
                         # Assuming Zerodha Historical returns completed or we accept the slight noise of forming 5-min count.
                         
                         # Calculate Features
+                        # Debug: Check Data Integrity
+                        if not hist_df.empty:
+                             # logging.info(f"🐛 {symbol} Data Head: {hist_df.head(1).to_dict()}")
+                             if 'volume' not in hist_df.columns:
+                                 logging.error(f"❌ {symbol}: 'volume' column missing! Cols: {hist_df.columns}")
+                        
                         hist_df['close'] = hist_df['close']
                         hist_df['log_ret'] = np.log(hist_df['close'] / hist_df['close'].shift(1))
+                        # ... rest of calc ...
+
+                        # ...
+                        
+                        # RVOL (Relative Volume)
+                        # Ensure volume is numeric
+                        hist_df['volume'] = pd.to_numeric(hist_df['volume'], errors='coerce').fillna(0)
+                        
+                        vol_sma = hist_df['volume'].rolling(20).mean().iloc[-1]
+                        current_vol = hist_df['volume'].iloc[-1]
+                        rvol = current_vol / vol_sma if vol_sma > 0 else 0
+                        
+                        # logging.info(f"📊 {symbol} Vol: {current_vol}, SMA: {vol_sma}, RVOL: {rvol}")
+
+                        # ...
+
+        # Save latest_scan.json for WhatsApp Scheduler
+        try:
+             # Sort by Score (Desc)
+             scan_results.sort(key=lambda x: x['Score'] if isinstance(x['Score'], int) else 0, reverse=True)
+             
+             if scan_results:
+                 # Atomic Write to prevent race conditions (UI reading empty file)
+                 temp_file = "latest_scan.tmp"
+                 with open(temp_file, "w") as f:
+                     json.dump({
+                         "timestamp": now.strftime("%Y-%m-%d %H:%M:%S"),
+                         "top_picks": scan_results
+                     }, f)
+                 os.replace(temp_file, "latest_scan.json")
+             else:
+                 logging.warning("⚠️ Scan Results Empty. Skipping JSON write.")
+                 
+        except Exception as e:
+            logging.error(f"Failed to save latest_scan.json: {e}")
                         hist_df['hv_10'] = hist_df['log_ret'].rolling(10).std() * np.sqrt(252*375) * 100
                         hist_df['hv_20'] = hist_df['log_ret'].rolling(20).std() * np.sqrt(252*375) * 100
                         
