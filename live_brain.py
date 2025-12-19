@@ -484,25 +484,7 @@ class LiveBrain:
 
                         # ...
 
-        # Save latest_scan.json for WhatsApp Scheduler
-        try:
-             # Sort by Score (Desc)
-             scan_results.sort(key=lambda x: x['Score'] if isinstance(x['Score'], int) else 0, reverse=True)
-             
-             if scan_results:
-                 # Atomic Write to prevent race conditions (UI reading empty file)
-                 temp_file = "latest_scan.tmp"
-                 with open(temp_file, "w") as f:
-                     json.dump({
-                         "timestamp": now.strftime("%Y-%m-%d %H:%M:%S"),
-                         "top_picks": scan_results
-                     }, f)
-                 os.replace(temp_file, "latest_scan.json")
-             else:
-                 logging.warning("⚠️ Scan Results Empty. Skipping JSON write.")
-                 
-        except Exception as e:
-            logging.error(f"Failed to save latest_scan.json: {e}")
+
                         hist_df['hv_10'] = hist_df['log_ret'].rolling(10).std() * np.sqrt(252*375) * 100
                         hist_df['hv_20'] = hist_df['log_ret'].rolling(20).std() * np.sqrt(252*375) * 100
                         
@@ -810,14 +792,23 @@ class LiveBrain:
                     self.tm.close_trade(symbol, curr_opt_price, "Hard Stop Loss")
         
         # Save latest_scan.json for WhatsApp Scheduler
+        # Save latest_scan.json
         try:
              # Sort by Score (Desc)
              scan_results.sort(key=lambda x: x['Score'] if isinstance(x['Score'], int) else 0, reverse=True)
-             with open("latest_scan.json", "w") as f:
-                 json.dump({
-                     "timestamp": now.strftime("%Y-%m-%d %H:%M:%S"),
-                     "top_picks": scan_results
-                 }, f)
+             
+             if scan_results:
+                 # Atomic Write to prevent race conditions (UI reading empty file)
+                 temp_file = "latest_scan.tmp"
+                 with open(temp_file, "w") as f:
+                     json.dump({
+                         "timestamp": now.strftime("%Y-%m-%d %H:%M:%S"),
+                         "top_picks": scan_results
+                     }, f)
+                 os.replace(temp_file, "latest_scan.json")
+             else:
+                 logging.warning("⚠️ Scan Results Empty. Skipping JSON write.")
+
         except Exception as e:
             logging.error(f"Failed to save latest_scan.json: {e}")
 
