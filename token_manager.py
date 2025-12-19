@@ -51,6 +51,7 @@ def write_token_file(new_token):
     try:
         with open("zerodha_hot_token.txt", "w") as f:
             f.write(new_token.strip())
+        os.chmod("zerodha_hot_token.txt", 0o666)
         return True
     except Exception as e:
         logging.error(f"Error writing token file: {e}")
