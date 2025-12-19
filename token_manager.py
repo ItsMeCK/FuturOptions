@@ -210,8 +210,8 @@ HTML_TEMPLATE = """
             container.innerHTML = html;
         }
 
-        // Auto Refresh every 3s
-        setInterval(fetchData, 3000);
+        // Auto Refresh every 60s (Matches Bot Loop)
+        setInterval(fetchData, 60000);
         fetchData(); // Initial call
         
         // Handle Form Response (Switch to Settings if message present)
