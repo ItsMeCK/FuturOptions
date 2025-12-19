@@ -816,11 +816,20 @@ class LiveBrain:
 
         # 5. Save Scan to Dashboard
         try:
-            df_res = pd.DataFrame(scan_results)
-            new_row = {"Symbol": "INDIA VIX", "Price": vix_value, "Status": vix_status, "Reason": "Market Gauge"}
-            df_res = pd.concat([df_res, pd.DataFrame([new_row])], ignore_index=True)
-            df_res.to_json("scan_status.json", orient='records')
-            logging.info(f"✅ Scan Complete. Checked {len(focus_list)} stocks. Live Prices Updated.")
+            if scan_results:
+                df_res = pd.DataFrame(scan_results)
+                new_row = {"Symbol": "INDIA VIX", "Price": vix_value, "Status": vix_status, "Reason": "Market Gauge"}
+                df_res = pd.concat([df_res, pd.DataFrame([new_row])], ignore_index=True)
+                
+                # Atomic Write
+                temp_status = "scan_status.tmp"
+                df_res.to_json(temp_status, orient='records')
+                os.replace(temp_status, "scan_status.json")
+                os.chmod("scan_status.json", 0o666)
+                logging.info(f"✅ Scan Complete. Checked {len(focus_list)} stocks. Live Prices Updated.")
+            else:
+                 logging.warning("⚠️ Scan Results Empty. Preserving old Dashboard Data.")
+                 
         except Exception as e:
             logging.error(f"Error saving dashboard feed: {e}")
 
