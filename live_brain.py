@@ -58,8 +58,10 @@ class LiveBrain:
         self.tm = TradeManager()
         self.llm_judge = LLMJudge()
         self.news_fetcher = NewsFetcher()
-        # Access Token from Env (passed by Dashboard or .env)
-        self.access_token = os.environ.get("ZERODHA_ACCESS_TOKEN")
+        self.news_fetcher = NewsFetcher()
+        
+        # Load Token (Priority: Hot File > Env)
+        self.access_token = self.load_initial_token()
         
         if self.access_token:
             # Initialize Fetcher with explicit token
@@ -69,6 +71,23 @@ class LiveBrain:
             logging.warning("⚠️ No Access Token found! Running in Simulation/Fallback Mode.")
             self.fetcher = ZerodhaDataFetcher() # Will likely fail or be empty
             self.options_brain = OptionsBrain(self.fetcher)
+
+    def load_initial_token(self):
+        """Load token with priority: File > Env."""
+        hot_file = "zerodha_hot_token.txt"
+        if os.path.exists(hot_file):
+            try:
+                with open(hot_file, "r") as f:
+                    token = f.read().strip()
+                if token:
+                    logging.info("hj Access Token loaded from Hot File.")
+                    return token
+            except Exception as e:
+                logging.error(f"Error reading hot file in init: {e}")
+        
+        # Fallback to Env
+        logging.info("📂 Access Token loaded from .env (Fallback).")
+        return os.environ.get("ZERODHA_ACCESS_TOKEN")
 
         self.top_20 = self.load_top_20()
         self.models = self.load_models()
