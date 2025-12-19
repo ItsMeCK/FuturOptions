@@ -69,7 +69,7 @@ class OptionsBrain:
         ce_sym, pe_sym, strike = self.construct_option_symbols(symbol, spot_price)
         
         try:
-            # logging.info(f"🧠 OptionsBrain Requesting: {ce_sym}, {pe_sym}")
+            logging.info(f"🧠 OptionsBrain Requesting: {ce_sym}, {pe_sym}")
             quotes = self.fetcher.fetch_live_quote([ce_sym, pe_sym])
             # logging.info(f"🧠 OptionsBrain Received Keys: {list(quotes.keys())}")
             
