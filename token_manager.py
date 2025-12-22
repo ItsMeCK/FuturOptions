@@ -191,7 +191,7 @@ HTML_TEMPLATE = """
 
             let html = '<table><thead><tr><th>Symbol</th><th>Score</th><th>Signal</th><th>RVOL</th><th>Stats</th></tr></thead><tbody>';
             
-            scanData.top_picks.slice(0, 10).forEach(item => {
+            scanData.top_picks.forEach(item => {
                 const signalClass = item.Signal === 'LONG' ? 'green' : (item.Signal === 'SHORT' ? 'red' : 'gray');
                 const scoreColor = item.Score >= 75 ? 'green' : (item.Score >= 60 ? '#fbbf24' : '#64748b');
                 
