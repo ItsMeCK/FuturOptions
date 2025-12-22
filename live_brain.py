@@ -371,9 +371,9 @@ class LiveBrain:
         # FALLBACK LOGIC
         if not focus_list:
             if self.top_20:
-                focus_list = self.top_20[:10] # Take top 10
+                focus_list = self.top_20[:20] # Take top 20
                 focus_reason = "Fallback to Leaderboard"
-                logging.info(f"⚠️ Focus List Missing/Outdated. Falling back to Top 10 Leaderboard: {focus_list}")
+                logging.info(f"⚠️ Focus List Missing/Outdated. Falling back to Top 20 Leaderboard: {focus_list}")
             else:
                  logging.warning("⚠️ No Focus List AND No Leaderboard. Snoozing...")
                  time.sleep(10)
