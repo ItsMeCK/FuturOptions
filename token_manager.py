@@ -3,14 +3,23 @@ import os
 import logging
 import json
 import time
+from kiteconnect import KiteConnect
+from dotenv import load_dotenv
+
+# Load Env
+load_dotenv()
 
 # Configure Logging
 logging.basicConfig(level=logging.INFO)
 
 app = Flask(__name__)
 
-# Basic Auth (Hardcoded or Env Var)
+# Basic Auth
 AUTH_PIN = os.environ.get("TOKEN_PIN", "123456") 
+
+# Zerodha Config
+API_KEY = os.getenv("ZERODHA_API_KEY")
+API_SECRET = os.getenv("ZERODHA_API_SECRET")
 
 # --- DATA HELPERS ---
 def load_json_safe(filename):
@@ -55,6 +64,7 @@ HTML_TEMPLATE = """
         /* CARDS */
         .card { background: var(--card); padding: 20px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
         h2 { margin-top: 0; color: var(--primary); font-size: 1.2rem; display: flex; justify-content: space-between; align-items: center; }
+        h3 { margin: 10px 0 5px 0; font-size: 1rem; color: #94a3b8; }
         
         /* TABLES */
         table { width: 100%; border-collapse: collapse; margin-top: 10px; }
@@ -71,9 +81,10 @@ HTML_TEMPLATE = """
         .pnl-neg { color: var(--red); font-weight: bold; }
 
         /* SETTINGS FORM */
-        input { width: 100%; padding: 12px; margin: 10px 0; background: #334155; border: 1px solid #475569; color: white; border-radius: 6px; }
+        input { width: 100%; padding: 12px; margin: 5px 0 15px 0; background: #334155; border: 1px solid #475569; color: white; border-radius: 6px; }
         button { width: 100%; padding: 12px; background: var(--primary); color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; }
         button:hover { background: #1d4ed8; }
+        button.secondary { background: #475569; margin-top: 10px; }
         
         .toast { padding: 10px; border-radius: 6px; margin-top: 10px; text-align: center; font-weight: bold; }
         .success { background: rgba(34, 197, 94, 0.2); color: var(--green); border: 1px solid var(--green); }
@@ -86,7 +97,7 @@ HTML_TEMPLATE = """
     <div class="container">
         <div class="tabs">
             <div class="tab active" onclick="switchTab('dashboard')">📊 Dashboard</div>
-            <div class="tab" onclick="switchTab('settings')">⚙️ Settings</div>
+            <div class="tab" onclick="switchTab('settings')">⚙️ Token Generator</div>
         </div>
 
         <!-- DASHBOARD TAB -->
@@ -108,20 +119,41 @@ HTML_TEMPLATE = """
 
         <!-- SETTINGS TAB -->
         <div id="settings" class="tab-content">
-            <div class="card" style="max-width: 500px; margin: 0 auto;">
-                <h2>🔑 Update Zerodha Token</h2>
+            <div class="card" style="max-width: 600px; margin: 0 auto;">
+                <h2>🔑 Zerodha Token Automation</h2>
+                
+                {% if message %}
+                    <div class="toast {{ status }}">{{ message }}</div>
+                    <br>
+                {% endif %}
+
                 <form method="POST">
-                    <label>Security PIN:</label>
+                    <input type="hidden" name="action" value="generate">
+                    <label>Security PIN (Required for any action):</label>
                     <input type="password" name="pin" placeholder="Enter PIN" required>
                     
-                    <label>New Access Token:</label>
-                    <input type="text" name="token" placeholder="Paste new token here" required>
+                    <hr style="border-color: #334155; margin: 20px 0;">
+
+                    <!-- STEP 1 -->
+                    <h3>1️⃣ Step 1: Login & Get Code</h3>
+                    <p style="font-size: 0.9em; color: #cbd5e1;">Click below to login. You will be redirected to a page that fails to load. <b>Copy the 'request_token=xyz...' part from the URL bar.</b></p>
+                    <a href="{{ login_url }}" target="_blank" style="display:block; text-align:center; padding:10px; background:#475569; color:white; text-decoration:none; border-radius:6px; font-weight:bold;">👉 Open Zerodha Login</a>
                     
-                    <button type="submit">Save & Hot Reload</button>
+                    <br>
+
+                    <!-- STEP 2 -->
+                    <h3>2️⃣ Step 2: Paste Request Token</h3>
+                    <input type="text" name="request_token" placeholder="Paste Request Token here (e.g., 3RlwB5...)">
+                    <button type="submit">🔄 Generate & Save Access Token</button>
+
+                    <hr style="border-color: #334155; margin: 20px 0;">
                     
-                    {% if message %}
-                        <div class="toast {{ status }}">{{ message }}</div>
-                    {% endif %}
+                    <!-- MANUAL OVERRIDE -->
+                    <h3>⚠️ Manual Override (Optional)</h3>
+                    <p style="font-size: 0.9em; color: #cbd5e1;">If the generator fails, paste the final Access Token directly.</p>
+                    <input type="text" name="manual_token" placeholder="Paste Full Access Token">
+                    <button type="submit" name="action" value="manual" class="secondary">💾 Save Manually</button>
+                    
                 </form>
             </div>
         </div>
@@ -210,11 +242,10 @@ HTML_TEMPLATE = """
             container.innerHTML = html;
         }
 
-        // Auto Refresh every 60s (Matches Bot Loop)
+        // Auto Refresh every 60s
         setInterval(fetchData, 60000);
-        fetchData(); // Initial call
+        fetchData(); 
         
-        // Handle Form Response (Switch to Settings if message present)
         {% if message %}
             switchTab('settings');
         {% endif %}
@@ -230,32 +261,66 @@ def home():
     message = ""
     status = ""
     
+    # Generate Link using Kite SDK
+    login_url = "#"
+    if API_KEY:
+        try:
+            kite = KiteConnect(api_key=API_KEY)
+            login_url = kite.login_url()
+        except:
+            pass
+
     if request.method == "POST":
         pin = request.form.get("pin")
-        token = request.form.get("token")
+        action = request.form.get("action")
         
         if pin != AUTH_PIN:
              message = "❌ Invalid PIN!"
              status = "error"
-        elif not token:
-             message = "❌ Token cannot be empty!"
-             status = "error"
         else:
-            # Hot Reload Write
-            if write_token_file(token):
-                 message = "✅ Token Saved! Brain will update momentarily."
-                 status = "success"
-            else:
-                message = "❌ Failed to write token file."
-                status = "error"
+            # 1. GENERATE FROM REQUEST TOKEN
+            if action == "generate":
+                req_token = request.form.get("request_token")
+                if not req_token:
+                    message = "❌ Request Token Missing!"
+                    status = "error"
+                elif not API_KEY or not API_SECRET:
+                    message = "❌ API Key/Secret missing in .env!"
+                    status = "error"
+                else:
+                    try:
+                        kite = KiteConnect(api_key=API_KEY)
+                        data = kite.generate_session(req_token, api_secret=API_SECRET)
+                        access_token = data["access_token"]
+                        
+                        if write_token_file(access_token):
+                            message = "✅ SUCCESS! Access Token Generated & Saved. Brain will reload."
+                            status = "success"
+                        else:
+                            message = "❌ Generated token but failed to save file."
+                            status = "error"
+                    except Exception as e:
+                        message = f"❌ Error Generating Session: {e}"
+                        status = "error"
 
-    return render_template_string(HTML_TEMPLATE, message=message, status=status)
+            # 2. MANUAL SAVE
+            else:
+                manual_token = request.form.get("manual_token")
+                if not manual_token:
+                     message = "❌ Token cannot be empty!"
+                     status = "error"
+                elif write_token_file(manual_token):
+                     message = "✅ Manual Token Saved!"
+                     status = "success"
+                else:
+                    message = "❌ Failed to write token file."
+                    status = "error"
+
+    return render_template_string(HTML_TEMPLATE, message=message, status=status, login_url=login_url)
 
 @app.route("/api/scan")
 def get_scan():
-    # Switch to scan_status.json which is more reliable
     data = load_json_safe("scan_status.json")
-    # Wrap in expected format if it's a list (since scan_status.json is orient='records')
     if isinstance(data, list):
          return jsonify({"top_picks": data, "timestamp": "Live"})
     return jsonify(data)
