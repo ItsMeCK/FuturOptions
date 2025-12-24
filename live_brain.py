@@ -78,6 +78,7 @@ class LiveBrain:
         self.running = True
         self.simulation_time = None
         self.last_processed_candle = {} # Track last processed candle timestamp per symbol
+        self.last_leaderboard_update = 0 # Unix timestamp of last scan
         
         # Load F&O Universe
         self.universe = []
@@ -374,6 +375,13 @@ class LiveBrain:
                 
                 # Market Open
                 self.check_hot_reload()
+                
+                # --- DYNAMIC SCANNER TRIGGER ---
+                # Run update whenever market opens, and then every 15 mins
+                if (time.time() - self.last_leaderboard_update) > 900: # 15 minutes
+                    self.update_leaderboard()
+                    self.last_leaderboard_update = time.time()
+                
                 self.scan_market()
                 time.sleep(60)
                     
@@ -433,12 +441,13 @@ class LiveBrain:
         
         logging.info(f"⏳ Scanning Market... {now.strftime('%H:%M:%S')}")
         
-        # 0. Load Focus List (The Analyst's Picks)
-        focus_list = []
-        focus_data = {} # Store full data including key levels
-        focus_reason = "Waiting for Analyst..."
+        # 0. DEPLOY DYNAMIC FOCUS LIST (The Scanner's Picks)
+        focus_list = getattr(self, 'focus_list', [])
+        focus_data = {} 
+        focus_reason = "Scanner Active"
         
-        if os.path.exists("focus_list.json"):
+        # Fallback to Analyst's JSON if scanner found nothing or list is small
+        if len(focus_list) < 5 and os.path.exists("focus_list.json"):
             try:
                 with open("focus_list.json", "r") as f:
                     data = json.load(f)
