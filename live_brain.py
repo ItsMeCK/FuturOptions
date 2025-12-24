@@ -904,11 +904,12 @@ class LiveBrain:
                 
                 # Fetch Current Option Price
                 try:
-                    q = self.fetcher.fetch_live_quote([opt_sym])
-                    if opt_sym in q:
-                        curr_opt_price = q[opt_sym]['last_price']
-                except:
-                    pass
+                    nfo_opt_sym = f"NFO:{opt_sym}"
+                    q = self.fetcher.fetch_live_quote([nfo_opt_sym])
+                    if nfo_opt_sym in q:
+                        curr_opt_price = q[nfo_opt_sym]['last_price']
+                except Exception as e:
+                    logging.error(f"Failed to fetch live P&L for {opt_sym}: {e}")
                 
                 current_pnl = (curr_opt_price - entry_opt_price) * qty
                 current_pnl_pct = (curr_opt_price - entry_opt_price) / entry_opt_price if entry_opt_price > 0 else 0
