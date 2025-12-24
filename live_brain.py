@@ -125,13 +125,12 @@ class LiveBrain:
         logging.info(f"🧠 Loaded {len(models)} Volatility Models.")
         return models
 
-    def calculate_confluence_score(self, symbol, price, adx, trend_dist, rsi, bandwidth, upper_band, rvol, vwap_dist, pred_rv, market_iv, focus_data, history=None):
+    def calculate_confluence_score(self, symbol, price, adx, trend_dist, rsi, bandwidth, upper_band, rvol, vwap_dist, pred_rv, market_iv, focus_data, history=None, rvol_5m_avg=0, is_momentum_active=False):
         score = 0
         reasons = []
         edge = 0.0
         
-        # 0. ANALYST BIAS (The "Human in the Loop" Factor)
-        # Using Data from Analyst Brain (Key Levels)
+        # 0. ANALYST BIAS
         analyst_bias = False
         breakout_lvl = 0.0
         breakdown_lvl = 0.0
@@ -141,80 +140,81 @@ class LiveBrain:
             breakout_lvl = float(data.get('breakout_level', 0))
             breakdown_lvl = float(data.get('breakdown_level', 0))
             
-            # Check for proximity to analyst levels
             if breakout_lvl > 0:
                 dist_to_breakout = (breakout_lvl - price) / price
-            else:
-                dist_to_breakout = float('inf') # Not applicable
+                if 0 < dist_to_breakout < 0.005: 
+                    score += 20
+                    reasons.append(f"Near Breakout {breakout_lvl}")
+                    analyst_bias = True
             
             if breakdown_lvl > 0:
                 dist_to_breakdown = (price - breakdown_lvl) / price
-            else:
-                dist_to_breakdown = float('inf') # Not applicable
-
-            if 0 < dist_to_breakout < 0.005: # Within 0.5% of breakout level
-                score += 20
-                reasons.append(f"Near Breakout {breakout_lvl}")
-                analyst_bias = True
-            elif 0 < dist_to_breakdown < 0.005: # Within 0.5% of breakdown level
-                score += 20
-                reasons.append(f"Near Breakdown {breakdown_lvl}")
-                analyst_bias = True
+                if 0 < dist_to_breakdown < 0.005:
+                    score += 20
+                    reasons.append(f"Near Breakdown {breakdown_lvl}")
+                    analyst_bias = True
             
-        # 1. Trend Quality (ADX)
-        if adx > 25:
-            score += 15
-            reasons.append(f"Strong Trend (ADX {adx:.1f})")
-            if history: history.update_persistence('trend')
+        # 1. Trend Quality (ADX) - UNIVERSITY FILTER
+        # Optimization showed ADX < 25 leads to negative expectancy.
+        if adx < 25:
+            return {
+                "score": 0,
+                "reasons": ["ADX < 25 (Choppy)"],
+                "edge": 0,
+                "breakout_lvl": breakout_lvl,
+                "breakdown_lvl": breakdown_lvl,
+                "signal_type": "NEUTRAL"
+            }
+        
+        # If passed, give points
+        score += 15
+        reasons.append(f"Strong Trend (ADX {adx:.1f})")
+        if history: history.update_persistence('trend')
         
         # 2. Momentum (Price vs SMA50)
-        # Dynamic threshold based on Market IV?
-        threshold = 0.02 # 2%
+        threshold = 0.02
         if trend_dist > threshold:
             score += 10
             reasons.append("Above SMA50")
         elif trend_dist < -threshold:
             score += 10
-            reasons.append("Below SMA50") # Bearish Momentum
+            reasons.append("Below SMA50")
             
-        # 3. Volatility Squeeze (Bandwidth)
-        # Squeeze logic: Low bandwidth relative to recent history
-        if bandwidth < 0.10: # 10% bandwidth is tight for stocks
+        # 3. Volatility Squeeze
+        if bandwidth < 0.10:
             score += 15
             reasons.append("Vol Squeeze")
             if history: history.update_persistence('squeeze')
             
-        # 4. Volume Flow (RVOL, Smart Money)
-        if rvol > 1.5:
-            score += 20
-            reasons.append(f"High Vol ({rvol:.1f}x)")
-        elif rvol > 1.2:
-            score += 10
-            reasons.append(f"Elevated Vol ({rvol:.1f}x)")
+        # 4. Volume Flow - UNIVERSITY LOGIC
+        # Priority 1: Ignition (Fresh Breakout)
+        effective_rvol = max(rvol, rvol_5m_avg)
+        
+        if effective_rvol > 2.0:
+            score += 30 # Massive Bonus
+            reasons.append(f"IGNITION Vol ({effective_rvol:.1f}x)")
+        elif is_momentum_active and effective_rvol > 0.5:
+             score += 20 # Continuation Bonus
+             reasons.append(f"Momentum Active ({effective_rvol:.1f}x)")
+        elif effective_rvol > 1.5:
+             score += 15
+             reasons.append(f"High Vol ({effective_rvol:.1f}x)")
             
-        # 5. AI Edge (Prediction vs Market)
-        # If Model Predicts Higher Volatility than market implies -> Expect Move
+        # 5. AI Edge
         if pred_rv > market_iv * 1.1:
             edge = (pred_rv - market_iv)
             score += 20
             reasons.append(f"AI Edge (+{edge:.1f}%)")
             
-        # 6. VWAP Reversion / Trend
-        # If price > VWAP and rising
-        if price > vwap_dist: # vwap_value passed as 'vwap_dist' argument name
+        # 6. VWAP Reversion
+        if price > vwap_dist:
              score += 5
-             # reasons.append("Above VWAP")
         
         # DETERMINE DIRECTION
-        # Simple heuristic for now: 
-        # Price > SMA50 & Price > Breakout -> LONG
-        # Price < SMA50 & Price < Breakdown -> SHORT
-        # If Squeeze, direction is determined by Breakout/Down
-        
         signal_type = "NEUTRAL"
         if price > upper_band or (breakout_lvl > 0 and price > breakout_lvl):
             signal_type = "LONG"
-        elif price < (upper_band - (upper_band * bandwidth)) or (breakdown_lvl > 0 and price < breakdown_lvl): # Lower Band approach
+        elif price < (upper_band - (upper_band * bandwidth)) or (breakdown_lvl > 0 and price < breakdown_lvl):
             signal_type = "SHORT"
             
         return {
@@ -555,10 +555,32 @@ class LiveBrain:
             # 3. INSTITUTIONAL CONFLUENCE SCORE (0-100)
             if last_price > 0:
                 hist = self.history[symbol]
+                # Momentum State (University Logic)
+                # Check last 5 candles (excluding current forming one at -1) for Ignition
+                is_momentum_active = False
+                if len(hist_df) > 6:
+                    # Recalculate rolling series for context
+                    # Note: vol_sma is a scalar at -1. We need series.
+                    vol_sma_series = hist_df['volume'].rolling(20).mean()
+                    rvol_series = hist_df['volume'] / vol_sma_series
+                    
+                    # Slice: Last 5 COMPLETED candles (-6 to -1)
+                    # Actually just check lookback window=5
+                    window_close = hist_df['close'].iloc[-6:-1]
+                    window_upper = upper.iloc[-6:-1]
+                    window_rvol = rvol_series.iloc[-6:-1]
+                    
+                    # Condition: Close > Upper AND RVOL > 2.0
+                    ignition_mask = (window_close > window_upper) & (window_rvol > 2.0)
+                    if ignition_mask.any():
+                        is_momentum_active = True
+
                 confluence = self.calculate_confluence_score(
                     symbol, last_price, adx_value, trend_dist, rsi, 
                     bandwidth, upper_band, rvol, vwap_value, 
-                    pred_rv, market_iv, focus_data, history=hist
+                    pred_rv, market_iv, focus_data, history=hist,
+                    rvol_5m_avg=rvol_5m_avg,
+                    is_momentum_active=is_momentum_active
                 )
                 
                 raw_score = confluence['score']
