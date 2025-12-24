@@ -445,11 +445,7 @@ class LiveBrain:
                         # NEW CANDLE CHECK
                         last_candle_time = hist_df.index[-1]
                         
-                        # Skip if we already processed this specific 5-min candle
-                        if self.last_processed_candle.get(symbol) == last_candle_time:
-                            # logging.info(f"⏳ {symbol}: Waiting for next 5-min candle...")
-                            continue 
-                            
+
                         # Mark this candle as processed
                         self.last_processed_candle[symbol] = last_candle_time
                         
