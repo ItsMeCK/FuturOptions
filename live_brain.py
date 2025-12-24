@@ -79,6 +79,8 @@ class LiveBrain:
         self.simulation_time = None
         self.last_processed_candle = {} # Track last processed candle timestamp per symbol
         self.last_leaderboard_update = 0 # Unix timestamp of last scan
+        self.universe_index = 0 # For rolling sweep
+        self.batch_size = 55    # Stocks per minute
         
         # Load F&O Universe
         self.universe = []
@@ -254,20 +256,14 @@ class LiveBrain:
         # 1. Trend Quality (ADX) - UNIVERSITY FILTER
         # Optimization showed ADX < 25 leads to negative expectancy.
         if adx < 25:
-            return {
-                "score": 0,
-                "reasons": ["ADX < 25 (Choppy)"],
-                "edge": 0,
-                "breakout_lvl": breakout_lvl,
-                "breakdown_lvl": breakdown_lvl,
-                "signal_type": "NEUTRAL"
-            }
-        
-        # If passed, give points
-        score += 15
-        reasons.append(f"Strong Trend (ADX {adx:.1f})")
-        if history: history.update_persistence('trend')
-        
+            reasons.append("ADX < 25 (Choppy)")
+            # Soft penalty: No trend points (15), but keep other score components
+        else:
+            # If passed, give points
+            score += 15
+            reasons.append(f"Strong Trend (ADX {adx:.1f})")
+            if history: history.update_persistence('trend')
+            
         # 2. Momentum (Price vs SMA50)
         threshold = 0.02
         if trend_dist > threshold:
@@ -309,7 +305,11 @@ class LiveBrain:
         
         # DETERMINE DIRECTION
         signal_type = "NEUTRAL"
-        if price > upper_band or (breakout_lvl > 0 and price > breakout_lvl):
+        
+        # Safety: Force NEUTRAL if trend is weak (ADX < 25)
+        if adx < 25:
+            signal_type = "NEUTRAL"
+        elif price > upper_band or (breakout_lvl > 0 and price > breakout_lvl):
             signal_type = "LONG"
         elif price < (upper_band - (upper_band * bandwidth)) or (breakdown_lvl > 0 and price < breakdown_lvl):
             signal_type = "SHORT"
@@ -441,13 +441,34 @@ class LiveBrain:
         
         logging.info(f"⏳ Scanning Market... {now.strftime('%H:%M:%S')}")
         
-        # 0. DEPLOY DYNAMIC FOCUS LIST (The Scanner's Picks)
-        focus_list = getattr(self, 'focus_list', [])
-        focus_data = {} 
-        focus_reason = "Scanner Active"
+        # 0. ROLLING UNIVERSE SWEEP (60 stocks per loop)
+        full_universe = getattr(self, 'universe', [])
         
-        # Fallback to Analyst's JSON if scanner found nothing or list is small
-        if len(focus_list) < 5 and os.path.exists("focus_list.json"):
+        if full_universe:
+            # Slice the next batch
+            start = self.universe_index
+            end = start + self.batch_size
+            
+            # Extract batch (with wrapping)
+            focus_list = full_universe[start:end]
+            
+            # If we didn't get a full batch (reached end), wrap around
+            if len(focus_list) < self.batch_size:
+                remainder = self.batch_size - len(focus_list)
+                focus_list += full_universe[0:remainder]
+                self.universe_index = remainder
+            else:
+                self.universe_index = (self.universe_index + self.batch_size) % len(full_universe)
+                
+            logging.info(f"🔄 Rolling Sweep: Batch [{start}:{end}] | Stocks: {len(focus_list)}")
+        else:
+            focus_list = getattr(self, 'focus_list', [])
+            
+        focus_data = {} 
+        focus_reason = "Rolling Sweep"
+        
+        # Fallback to Analyst's JSON only if we have NO universe and NO selection
+        if not focus_list and os.path.exists("focus_list.json"):
             try:
                 with open("focus_list.json", "r") as f:
                     data = json.load(f)
