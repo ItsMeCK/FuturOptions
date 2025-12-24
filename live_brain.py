@@ -739,6 +739,14 @@ class LiveBrain:
         except Exception as e:
             logging.error(f"Failed to save latest_scan.json: {e}")
             
+        try:
+            self.data_loader = ZerodhaDataFetcher()
+            # Pre-fetch NFO Instrument Dump for Smart Lookup
+            self.data_loader.refresh_instrument_dump()
+        except:
+            self.data_loader = None
+            logging.error("Failed to init Zerodha Data Loader")
+            
         for symbol in focus_list:
             # 4. Manage Active Trades (New Indentation Level - actually wait, the loop above was single iteration per symbol)
             # My previous view showed the loop ends after appending to scan_results?
