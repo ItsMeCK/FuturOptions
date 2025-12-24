@@ -880,21 +880,8 @@ class LiveBrain:
             }
             
             
+            
         # Post-Loop: Save Scan Result for WhatsApp Notification
-        try:
-             # Get full list from Master Memory
-             cumulative_results = list(self.all_scan_results.values())
-             
-             # Sort by Score (Desc) to highlight best opportunities
-             cumulative_results.sort(key=lambda x: x['Score'] if isinstance(x['Score'], int) else 0, reverse=True)
-             
-             with open("latest_scan.json", "w") as f:
-                 json.dump({
-                     "timestamp": now.strftime("%Y-%m-%d %H:%M:%S"),
-                     "top_picks": cumulative_results
-                 }, f)
-        except Exception as e:
-            logging.error(f"Failed to save latest_scan.json: {e}")
             
 
         for symbol in focus_list:
@@ -952,16 +939,18 @@ class LiveBrain:
         # Save latest_scan.json for WhatsApp Scheduler
         # Save latest_scan.json
         try:
+             # Get full list from Master Memory
+             cumulative_results = list(self.all_scan_results.values())
              # Sort by Score (Desc)
-             scan_results.sort(key=lambda x: x['Score'] if isinstance(x['Score'], int) else 0, reverse=True)
+             cumulative_results.sort(key=lambda x: x['Score'] if isinstance(x['Score'], int) else 0, reverse=True)
              
-             if scan_results:
+             if cumulative_results:
                  # Atomic Write to prevent race conditions (UI reading empty file)
                  temp_file = "latest_scan.tmp"
                  with open(temp_file, "w") as f:
                      json.dump({
                          "timestamp": now.strftime("%Y-%m-%d %H:%M:%S"),
-                         "top_picks": scan_results
+                         "top_picks": cumulative_results
                      }, f)
                  os.replace(temp_file, "latest_scan.json")
                  os.chmod("latest_scan.json", 0o666)
@@ -974,8 +963,9 @@ class LiveBrain:
 
         # 5. Save Scan to Dashboard
         try:
-            if scan_results:
-                df_res = pd.DataFrame(scan_results)
+            cumulative_results = list(self.all_scan_results.values())
+            if cumulative_results:
+                df_res = pd.DataFrame(cumulative_results)
                 new_row = {"Symbol": "INDIA VIX", "Price": vix_value, "Status": vix_status, "Reason": "Market Gauge"}
                 df_res = pd.concat([df_res, pd.DataFrame([new_row])], ignore_index=True)
                 
