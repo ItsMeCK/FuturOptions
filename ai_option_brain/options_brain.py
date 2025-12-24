@@ -14,50 +14,6 @@ class OptionsBrain:
         # In prod, this should find the nearest monthly expiry
         return "25DEC" 
 
-    def get_atm_strike(self, spot_price, step=50):
-        return round(spot_price / step) * step
-
-    def construct_option_symbols(self, symbol, spot_price, step=None):
-        """
-        Construct ATM, OTM, ITM symbols for analysis.
-        """
-        # Step sizes map (approx)
-        step_map = {
-            "NIFTY": 50, "BANKNIFTY": 100, "FINNIFTY": 50,
-            "RELIANCE": 20, "INFY": 20, "TCS": 50, "SBIN": 10,
-            "HDFCBANK": 10, "ICICIBANK": 10, "LT": 50, "AXISBANK": 10,
-            "HINDUNILVR": 20, "MARUTI": 100, "ADANIENT": 50, "KOTAKBANK": 20,
-            "BHARTIARTL": 10, "BAJFINANCE": 50, "TITAN": 20, "TATASTEEL": 2.5,
-            "HINDALCO": 10, "BEL": 5, "ASIANPAINT": 20, "ULTRACEMCO": 100
-        }
-        
-        strike_step = step if step else step_map.get(symbol, 10) # Default 10 for stocks
-        if symbol == "NIFTY": strike_step = 50
-        
-        atm_strike = self.get_atm_strike(spot_price, strike_step)
-        
-        # Construct Symbols (e.g., INFY25DEC1600CE)
-        # Zerodha Format: SYMBOL + YY + MMM + STRIKE + CE/PE
-        # Example: INFY25DEC1600CE
-        
-        # We need to handle the strike format. 
-        # NIFTY 24500 -> 24500
-        # Stock 1600 -> 1600
-        # Stock 1600.5 -> Not supported usually in symbol string directly without checking format
-        
-        base = f"{symbol}{self.current_expiry}"
-        
-        # Format strike: 167.5 -> "167.5", 160.0 -> "160"
-        if atm_strike % 1 == 0:
-            str_strike = str(int(atm_strike))
-        else:
-            str_strike = str(atm_strike)
-            
-        ce_symbol = f"NFO:{base}{str_strike}CE"
-        pe_symbol = f"NFO:{base}{str_strike}PE"
-        
-        return ce_symbol, pe_symbol, atm_strike
-
     def analyze_sentiment(self, symbol, spot_price):
         """
         Analyze Option Chain Sentiment.
@@ -66,7 +22,17 @@ class OptionsBrain:
         if not self.fetcher or not self.fetcher.kite:
             return "NEUTRAL", {"reason": "No Data"}
             
-        ce_sym, pe_sym, strike = self.construct_option_symbols(symbol, spot_price)
+        # Use Data Fetcher's Smart Lookup (Correct Source of Truth)
+        # Note: get_option_symbol returns (tradingsymbol, strike)
+        ce_sym_raw, strike = self.fetcher.get_option_symbol(symbol, spot_price, "CE")
+        pe_sym_raw, _ = self.fetcher.get_option_symbol(symbol, spot_price, "PE")
+        
+        if not ce_sym_raw or not pe_sym_raw:
+             return "NEUTRAL", {"reason": "Smart Lookup Failed"}
+             
+        # Add NFO: prefix if needed (Smart Lookup returns tradingsymbol e.g. "ADANIENT25DEC...")
+        ce_sym = f"NFO:{ce_sym_raw}"
+        pe_sym = f"NFO:{pe_sym_raw}"
         
         try:
             logging.info(f"🧠 OptionsBrain Requesting: {ce_sym}, {pe_sym}")
