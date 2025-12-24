@@ -16,6 +16,12 @@ sudo systemctl restart scheduler
 sudo systemctl restart token_ui
 
 # 3. Check Status
-echo -e "${GREEN}📊 Current Status:${NC}"
+echo -e "${GREEN}📊 System Status:${NC}"
+echo -n "🧠 Brain Scanner: "
 sudo systemctl status brain --no-pager | grep "Active:"
+echo -n "📱 WhatsApp Bot: "
+sudo systemctl status scheduler --no-pager | grep "Active:"
+echo -n "🌐 Token UI:     "
+sudo systemctl status token_ui --no-pager | grep "Active:"
+
 echo -e "${GREEN}✅ System Updated and Running!${NC}"
