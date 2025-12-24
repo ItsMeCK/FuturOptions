@@ -81,6 +81,7 @@ class LiveBrain:
         self.last_leaderboard_update = 0 # Unix timestamp of last scan
         self.universe_index = 0 # For rolling sweep
         self.batch_size = 55    # Stocks per minute
+        self.all_scan_results = {} # Master Memory for Dashboard (Persistent)
         
         # Load F&O Universe
         self.universe = []
@@ -530,7 +531,7 @@ class LiveBrain:
         if vix_value < 11: vix_status = "LOW (Complacency)"
         elif vix_value > 20: vix_status = "HIGH (Panic)"
 
-        scan_results = []
+        # No local scan_results initialization here to keep all_scan_results persistent
         
         for symbol in focus_list:
             # Default Values
@@ -861,8 +862,8 @@ class LiveBrain:
                         }
                         self.tm.add_trade(symbol, entry_data)
             
-            # Collect Data
-            scan_results.append({
+            # Collect Data (Update Master Memory)
+            self.all_scan_results[symbol] = {
                 "Symbol": symbol,
                 "Score": score, 
                 "Status": status,
@@ -876,17 +877,21 @@ class LiveBrain:
                 "LLM Conf": llm_conf,
                 "Reason": rejection_reason,
                 "Last Update": now.strftime('%H:%M:%S')
-            })
+            }
+            
             
         # Post-Loop: Save Scan Result for WhatsApp Notification
         try:
+             # Get full list from Master Memory
+             cumulative_results = list(self.all_scan_results.values())
+             
              # Sort by Score (Desc) to highlight best opportunities
-             scan_results.sort(key=lambda x: x['Score'] if isinstance(x['Score'], int) else 0, reverse=True)
+             cumulative_results.sort(key=lambda x: x['Score'] if isinstance(x['Score'], int) else 0, reverse=True)
              
              with open("latest_scan.json", "w") as f:
                  json.dump({
                      "timestamp": now.strftime("%Y-%m-%d %H:%M:%S"),
-                     "top_picks": scan_results
+                     "top_picks": cumulative_results
                  }, f)
         except Exception as e:
             logging.error(f"Failed to save latest_scan.json: {e}")
