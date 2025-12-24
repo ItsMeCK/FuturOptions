@@ -54,7 +54,10 @@ class NotificationScheduler:
             
             msg = "🔭 *Hourly Market Scan*\n\nTop Opportunities:\n"
             for item in top[:5]:
-                msg += f"⭐ {item['symbol']} (Score: {item['score']})\n"
+                # Use .get() with fallback to handle potential casing differences
+                symbol = item.get('Symbol', item.get('symbol', 'Unknown'))
+                score = item.get('Score', item.get('score', 0))
+                msg += f"⭐ {symbol} (Score: {score})\n"
             
             self.bot.send_message(msg)
             
