@@ -745,12 +745,12 @@ class LiveBrain:
                 
             # 2. TYPE B: REVERSION MONSTER (Buy the Dip)
             # Conditions: High Exhaustion Vol (RVOL > 3.0) + Low ADX (< 25)
-            elif score >= 60 and rvol > 3.0 and is_lower_half and opt_sentiment != "BEARISH" and adx_value < 25:
+            elif score >= 75 and rvol > 3.0 and is_lower_half and opt_sentiment != "BEARISH" and adx_value < 25:
                 selected_strategy = "Type B (Reversion)"
             
             # 3. TYPE D: TREND CONTINUATION (Ride the Crash)
             # Conditions: Moderate Vol (RVOL > 2.0) + High ADX (> 25) -> Force SHORT
-            elif score >= 60 and rvol > 2.0 and is_lower_half and adx_value >= 25:
+            elif score >= 75 and rvol > 2.0 and is_lower_half and adx_value >= 25:
                 signal_type = "SHORT" # Override for Put Entry
                 selected_strategy = "Type D (Trend Crash)"
                 
@@ -808,9 +808,12 @@ class LiveBrain:
                     # Fetch Option Quote
                     opt_price = 0.0
                     try:
-                        opt_quote = self.fetcher.fetch_live_quote([opt_symbol])
-                        if opt_symbol in opt_quote:
-                            opt_price = opt_quote[opt_symbol]['last_price']
+                        nfo_opt_symbol = f"NFO:{opt_symbol}"
+                        opt_quote = self.fetcher.fetch_live_quote([nfo_opt_symbol])
+                        if nfo_opt_symbol in opt_quote:
+                            opt_price = opt_quote[nfo_opt_symbol]['last_price']
+                        else:
+                            logging.error(f"❌ Abort: Symbol {nfo_opt_symbol} not found in quote response.")
                     except Exception as e:
                         logging.error(f"Failed to fetch option quote for {opt_symbol}: {e}")
                     
