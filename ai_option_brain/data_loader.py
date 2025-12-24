@@ -147,6 +147,21 @@ class ZerodhaDataFetcher:
         """Return lot size for the symbol."""
         return LOT_SIZES.get(symbol, 1) # Default to 1 if not found
 
+# Strike Step Sizes (Approximate for Top Liquid Stocks)
+STRIKE_STEPS = {
+    "ADANIENT": 50, "ADANIPORTS": 10, "APOLLOHOSP": 50, "ASIANPAINT": 20, "AXISBANK": 10,
+    "BAJAJ-AUTO": 50, "BAJAJFINSV": 10, "BAJFINANCE": 50, "BEL": 5, "BHARTIARTL": 10,
+    "BPCL": 5, "BRITANNIA": 50, "CIPLA": 10, "COALINDIA": 2.5, "DIVISLAB": 50,
+    "DRREDDY": 50, "EICHERMOT": 50, "GRASIM": 10, "HCLTECH": 10, "HDFCBANK": 10,
+    "HDFCLIFE": 5, "HEROMOTOCO": 50, "HINDALCO": 5, "HINDUNILVR": 20, "ICICIBANK": 10,
+    "INDUSINDBK": 10, "INFY": 10, "ITC": 2.5, "JSWSTEEL": 5, "KOTAKBANK": 10,
+    "LT": 20, "LTIM": 50, "M&M": 20, "MARUTI": 100, "NESTLEIND": 100,
+    "NTPC": 2.5, "ONGC": 2.5, "POWERGRID": 2.5, "RELIANCE": 20, "SBILIFE": 10,
+    "SBIN": 5, "SUNPHARMA": 10, "TATACONSUM": 10, "TATAMOTORS": 5, "TATASTEEL": 1,
+    "TCS": 20, "TECHM": 10, "TITAN": 20, "ULTRACEMCO": 100, "UPL": 5, "WIPRO": 5,
+    "NIFTY": 50, "BANKNIFTY": 100, "FINNIFTY": 50
+}
+
     def get_option_symbol(self, symbol, spot_price, option_type="CE"):
         """
         Construct Zerodha Option Symbol.
@@ -154,24 +169,30 @@ class ZerodhaDataFetcher:
         Example: RELIANCE24JAN2500CE
         """
         try:
-            # 1. Calculate ATM Strike
-            # Round to nearest strike step (Assuming 20/50/100 steps based on price)
-            # Simple heuristic: < 500 -> 5, < 1000 -> 10, < 3000 -> 20, > 3000 -> 50
-            step = 10
-            if spot_price < 500: step = 5
-            elif spot_price > 3000: step = 50
-            elif spot_price > 1000: step = 20
-            
+            # 1. Determine Strike Step
+            if symbol in STRIKE_STEPS:
+                step = STRIKE_STEPS[symbol]
+            else:
+                # Fallback Heuristics
+                if spot_price < 500: step = 5
+                elif spot_price > 3000: step = 50
+                elif spot_price > 1000: step = 20
+                else: step = 10
+
+            # 2. Round to Nearest Step
             strike = round(spot_price / step) * step
             
-            # 2. Get Date Components
-            now = datetime.now()
-            yy = str(now.year)[-2:] # '24'
-            mmm = now.strftime("%b").upper() # 'JAN'
+            # Special handling for floats (e.g. 2.5 -> strike could be 152.5)
+            # Zerodha symbols usually ignore decimal if .0, but keep it if .5?
+            # Actually NFO stocks usually don't have decimals in symbol unless specific.
+            # Safe bet: Int for mostly everything given the list above.
+            if step >= 1:
+                strike = int(strike)
             
-            # 3. Construct Symbol
-            # Handle NIFTY/BANKNIFTY Weekly vs Monthly? 
-            # For Stocks, it's always Monthly.
+            # 3. Get Date Components
+            now = datetime.now()
+            yy = str(now.year)[-2:] # '25'
+            mmm = now.strftime("%b").upper() # 'DEC'
             
             # CRITICAL: Zerodha requires NFO: prefix for options
             opt_symbol = f"NFO:{symbol}{yy}{mmm}{strike}{option_type}"
