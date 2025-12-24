@@ -78,6 +78,15 @@ class LiveBrain:
         self.running = True
         self.simulation_time = None
         self.last_processed_candle = {} # Track last processed candle timestamp per symbol
+        
+        # Load F&O Universe
+        self.universe = []
+        if os.path.exists("fno_universe.txt"):
+            with open("fno_universe.txt") as f:
+                self.universe = [line.strip() for line in f if line.strip()]
+            logging.info(f"🌌 Loaded F&O Universe: {len(self.universe)} items")
+            
+        self.focus_list = ['ADANIENT', 'SBIN', 'ICICIBANK', 'INFY', 'TATASTEEL']  # Default Fallback
 
     def load_initial_token(self):
         """Load token with priority: File > Env."""
@@ -102,6 +111,93 @@ class LiveBrain:
         self.running = True
         self.simulation_time = None
         self.last_processed_candle = {} # Track last processed candle timestamp per symbol
+
+
+    def pre_scan_market(self):
+        """
+        Efficiently scan the full F&O Universe (200+ stocks) using Quote API.
+        Returns: Top 25 Most Active/Volatile stocks to deep-scan.
+        """
+        if not self.universe or not self.fetcher:
+            return self.top_20
+            
+        try:
+            # Batch Fetch (Zerodha allows large batches)
+            # Prefix with NSE:
+            exchange_symbols = [f"NSE:{s}" for s in self.universe]
+            
+            # Split into chunks of 500 (API Limit) - Though universe is ~200
+            quotes = self.fetcher.fetch_live_quote(exchange_symbols)
+            
+            if not quotes:
+                return self.top_20
+                
+            # Filter & Sort
+            # Criteria: High Volume AND % Change > 0.5%
+            candidates = []
+            
+            for sym, data in quotes.items():
+                clean_sym = sym.replace('NSE:', '')
+                ohlc = data.get('ohlc', {})
+                last_price = data.get('last_price', 0)
+                open_price = ohlc.get('open', 0)
+                volume = data.get('volume', 0)
+                
+                # Calculate % Change
+                pct_change = 0
+                if open_price > 0:
+                    pct_change = abs((last_price - open_price) / open_price) * 100
+                    
+                candidates.append({
+                    'symbol': clean_sym,
+                    'volume': volume,
+                    'pct_change': pct_change,
+                    'last_price': last_price
+                })
+            
+            # Sort by Activity (% Change is Opportunity)
+            candidates.sort(key=lambda x: x['pct_change'], reverse=True)
+            
+            # Select Top 20 Movers
+            top_movers = [x['symbol'] for x in candidates[:20]]
+            
+            # Also ensure Top 5 Volume Leaders are present
+            candidates.sort(key=lambda x: x['volume'], reverse=True)
+            top_volume = [x['symbol'] for x in candidates[:5]]
+            
+            # Combine Unique
+            final_list = list(set(top_movers + top_volume))
+            
+            logging.info(f"🌌 Universe Scan: Selected {len(final_list)} Active Stocks (Top Mover: {candidates[0]['symbol']})")
+            return final_list
+            
+        except Exception as e:
+            logging.error(f"Pre-Scan Failed: {e}")
+            return self.top_20
+
+    def update_leaderboard(self):
+        """Refreshes the Focus List based on Market Activity."""
+        logging.info("↻ Update Leaderboard Triggered...")
+        
+        # Method 1: Use Pre-Scan (Internal Data)
+        if self.universe:
+            logging.info("Running Pre-Scan on F&O Universe...")
+            self.focus_list = self.pre_scan_market()
+            # Update top_20 reference too for consistency
+            self.top_20 = self.focus_list
+            return
+            
+        # Method 2: External Scraping (Fallback)
+        try: 
+            new_list = self.fetch_leaderboard_data() 
+            if new_list:
+                self.focus_list = new_list
+                self.top_20 = new_list
+                logging.info(f"✅ Leaderboard Updated: {len(self.focus_list)} stocks")
+            else:
+                logging.warning("⚠️ Leaderboard fetch failed. Retaining old list.")
+        except Exception as e:
+            logging.error(f"Error updating leaderboard: {e}")
 
     def load_top_20(self):
         try:
