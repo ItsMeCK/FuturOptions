@@ -600,6 +600,11 @@ class LiveBrain:
                 breakdown_lvl = 0.0
                 signal_type = "NEUTRAL" 
             
+            # LOGGING UNIVERSITY LOGIC FOR USER VISIBILITY
+            if score > 0 or is_momentum_active:
+                state_str = "🔥 IGNITION/ACTIVE" if is_momentum_active else "💤 WAIT"
+                logging.info(f"📊 {symbol} {state_str} | Score: {score} | {reasons}")
+
             # DECISION LOGIC
             signal = False
             status = "WAIT"
