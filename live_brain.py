@@ -285,13 +285,19 @@ class LiveBrain:
             # Harsh Penalty to Block Entry
             score = 0 
             reasons = [f"BLOCKED: Churn (ER {er_value:.2f})"]
-            return {'score': 0, 'reasons': reasons, 'signal_type': 'NEUTRAL'}
+            return {
+                'score': 0, 'reasons': reasons, 'signal_type': 'NEUTRAL',
+                'edge': 0, 'breakout_lvl': 0, 'breakdown_lvl': 0
+            }
             
         # 2. Vacuum Block
         if vol_ratio < 0.8:
             score = 0
             reasons = [f"BLOCKED: Vol Dryup (Ratio {vol_ratio:.2f})"]
-            return {'score': 0, 'reasons': reasons, 'signal_type': 'NEUTRAL'}
+            return {
+                'score': 0, 'reasons': reasons, 'signal_type': 'NEUTRAL',
+                'edge': 0, 'breakout_lvl': 0, 'breakdown_lvl': 0
+            }
             
         # 2. Momentum (Price vs SMA50)
         threshold = 0.02
