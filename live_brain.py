@@ -92,6 +92,20 @@ class LiveBrain:
             
         self.focus_list = ['ADANIENT', 'SBIN', 'ICICIBANK', 'INFY', 'TATASTEEL']  # Default Fallback
 
+    def calculate_efficiency_ratio(self, close_series, period=6):
+        """
+        Efficiency Ratio = Abs(Net Change) / Sum(Abs(Change))
+        Measures directional efficiency vs noise.
+        """
+        if len(close_series) < period+1: return 1.0
+        
+        net_change = abs(close_series.iloc[-1] - close_series.iloc[-period-1])
+        diffs = np.diff(close_series.iloc[-period-1:])
+        total_path = np.sum(np.abs(diffs))
+        
+        if total_path == 0: return 1.0
+        return net_change / total_path
+
     def load_initial_token(self):
         """Load token with priority: File > Env."""
         hot_file = "zerodha_hot_token.txt"
@@ -225,7 +239,7 @@ class LiveBrain:
         logging.info(f"🧠 Loaded {len(models)} Volatility Models.")
         return models
 
-    def calculate_confluence_score(self, symbol, price, adx, trend_dist, rsi, bandwidth, upper_band, rvol, vwap_dist, pred_rv, market_iv, focus_data, history=None, rvol_5m_avg=0, is_momentum_active=False):
+    def calculate_confluence_score(self, symbol, price, adx, trend_dist, rsi, bandwidth, upper_band, rvol, vwap_dist, pred_rv, market_iv, focus_data, history=None, rvol_5m_avg=0, is_momentum_active=False, er_value=1.0, vol_ratio=1.0, vwap_value=0):
         score = 0
         reasons = []
         edge = 0.0
@@ -264,6 +278,20 @@ class LiveBrain:
             score += 15
             reasons.append(f"Strong Trend (ADX {adx:.1f})")
             if history: history.update_persistence('trend')
+
+        # --- SMART FILTERS (INSTITUTIONAL) ---
+        # 1. Churn Block
+        if er_value < 0.3:
+            # Harsh Penalty to Block Entry
+            score = 0 
+            reasons = [f"BLOCKED: Churn (ER {er_value:.2f})"]
+            return {'score': 0, 'reasons': reasons, 'signal_type': 'NEUTRAL'}
+            
+        # 2. Vacuum Block
+        if vol_ratio < 0.8:
+            score = 0
+            reasons = [f"BLOCKED: Vol Dryup (Ratio {vol_ratio:.2f})"]
+            return {'score': 0, 'reasons': reasons, 'signal_type': 'NEUTRAL'}
             
         # 2. Momentum (Price vs SMA50)
         threshold = 0.02
@@ -644,7 +672,19 @@ class LiveBrain:
                         rvol_rolling = (hist_df['volume'] / vol_sma) 
                         rvol_5m_avg = rvol_rolling.tail(5).mean() if len(hist_df) >= 5 else rvol
                         
-                        logging.info(f"🔍 {symbol}: RVOL={rvol:.2f}, 5m-Avg={rvol_5m_avg:.2f}, VWAP={vwap_value:.2f}")
+                        # --- SMART METRICS ---
+                        # Efficiency Ratio (Last 30m = 6 bars)
+                        er_value = self.calculate_efficiency_ratio(hist_df['close'], period=6)
+                        
+                        # Volume Ratio (Current 30m vs Prev 30m)
+                        # We need at least 12 bars (60 mins)
+                        vol_ratio = 1.0
+                        if len(hist_df) >= 12:
+                            curr_vol30 = hist_df['volume'].tail(6).mean()
+                            prev_vol30 = hist_df['volume'].iloc[-12:-6].mean()
+                            vol_ratio = curr_vol30 / prev_vol30 if prev_vol30 > 0 else 0
+                        
+                        logging.info(f"🔍 {symbol}: RVOL={rvol:.2f}, ER={er_value:.2f}, VolRatio={vol_ratio:.2f}")
 
                         # Trend Status
                         if adx_value > 25:
@@ -704,10 +744,13 @@ class LiveBrain:
 
                 confluence = self.calculate_confluence_score(
                     symbol, last_price, adx_value, trend_dist, rsi, 
-                    bandwidth, upper_band, rvol, vwap_value, 
-                    pred_rv, market_iv, focus_data, history=hist,
+                    bandwidth, upper_band, rvol, 0, pred_rv, market_iv, focus_data, 
+                    history=self.history[symbol],
                     rvol_5m_avg=rvol_5m_avg,
-                    is_momentum_active=is_momentum_active
+                    is_momentum_active=False,
+                    er_value=er_value,
+                    vol_ratio=vol_ratio,
+                    vwap_value=vwap_value
                 )
                 
                 raw_score = confluence['score']
