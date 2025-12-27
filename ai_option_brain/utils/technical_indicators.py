@@ -80,6 +80,29 @@ class TechnicalIndicators:
         return indicator.bollinger_hband(), indicator.bollinger_lband()
 
     @staticmethod
+    def calculate_bollinger_bandwidth(series, period=20, std_dev=2):
+        """
+        Calculates Bollinger Bandwidth = (Upper - Lower) / Middle
+        Used for Squeeze detection (Bandwidth < 0.15).
+        """
+        indicator = ta.volatility.BollingerBands(close=series, window=period, window_dev=std_dev)
+        upper = indicator.bollinger_hband()
+        lower = indicator.bollinger_lband()
+        middle = indicator.bollinger_mavg()
+        
+        # Avoid division by zero
+        bandwidth = (upper - lower) / middle
+        return bandwidth.replace([np.inf, -np.inf], 0).fillna(0)
+
+    @staticmethod
+    def calculate_atr(high, low, close, period=14):
+        """
+        Calculates Average True Range (ATR).
+        Used for Volatility-based Stops.
+        """
+        return ta.volatility.average_true_range(high=high, low=low, close=close, window=period)
+
+    @staticmethod
     def calculate_adx(high, low, close, window=14):
         """
         Calculates Average Directional Index (ADX).

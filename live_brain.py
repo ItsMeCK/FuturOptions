@@ -239,123 +239,63 @@ class LiveBrain:
         logging.info(f"🧠 Loaded {len(models)} Volatility Models.")
         return models
 
-    def calculate_confluence_score(self, symbol, price, adx, trend_dist, rsi, bandwidth, upper_band, rvol, vwap_dist, pred_rv, market_iv, focus_data, history=None, rvol_5m_avg=0, is_momentum_active=False, er_value=1.0, vol_ratio=1.0, vwap_value=0):
-        score = 0
+    def evaluate_strategies(self, symbol, price, adx, trend_dist, bandwidth, upper_band, rvol, vwap_dist, vwap_value, open_price, focus_data, history=None):
+        strategies_triggered = []
         reasons = []
-        edge = 0.0
+        score = 0
         
-        # 0. ANALYST BIAS
-        analyst_bias = False
-        breakout_lvl = 0.0
-        breakdown_lvl = 0.0
-        
-        if symbol in focus_data:
-            data = focus_data[symbol]
-            breakout_lvl = float(data.get('breakout_level', 0))
-            breakdown_lvl = float(data.get('breakdown_level', 0))
-            
-            if breakout_lvl > 0:
-                dist_to_breakout = (breakout_lvl - price) / price
-                if 0 < dist_to_breakout < 0.005: 
-                    score += 20
-                    reasons.append(f"Near Breakout {breakout_lvl}")
-                    analyst_bias = True
-            
-            if breakdown_lvl > 0:
-                dist_to_breakdown = (price - breakdown_lvl) / price
-                if 0 < dist_to_breakdown < 0.005:
-                    score += 20
-                    reasons.append(f"Near Breakdown {breakdown_lvl}")
-                    analyst_bias = True
-            
-        # 1. Trend Quality (ADX) - UNIVERSITY FILTER
-        # Optimization showed ADX < 25 leads to negative expectancy.
-        if adx < 25:
-            reasons.append("ADX < 25 (Choppy)")
-            # Soft penalty: No trend points (15), but keep other score components
-        else:
-            # If passed, give points
-            score += 15
-            reasons.append(f"Strong Trend (ADX {adx:.1f})")
-            if history: history.update_persistence('trend')
+        # --- COMMON GATEKEEPERS ---
+        # 1. Structure (Price > SMA 50)
+        if trend_dist < 0:
+            reasons.append(f"BLOCKED: Below SMA 50 (Dist {trend_dist:.2f}%)")
+            return {'strategies': [], 'reasons': reasons, 'score': 0, 'signal_type': 'NEUTRAL'}
 
-        # --- SMART FILTERS (INSTITUTIONAL) ---
-        # 1. Churn Block
-        if er_value < 0.3:
-            # Harsh Penalty to Block Entry
-            score = 0 
-            reasons = [f"BLOCKED: Churn (ER {er_value:.2f})"]
-            return {
-                'score': 0, 'reasons': reasons, 'signal_type': 'NEUTRAL',
-                'edge': 0, 'breakout_lvl': 0, 'breakdown_lvl': 0
-            }
-            
-        # 2. Vacuum Block
-        if vol_ratio < 0.8:
-            score = 0
-            reasons = [f"BLOCKED: Vol Dryup (Ratio {vol_ratio:.2f})"]
-            return {
-                'score': 0, 'reasons': reasons, 'signal_type': 'NEUTRAL',
-                'edge': 0, 'breakout_lvl': 0, 'breakdown_lvl': 0
-            }
-            
-        # 2. Momentum (Price vs SMA50)
-        threshold = 0.02
-        if trend_dist > threshold:
-            score += 10
-            reasons.append("Above SMA50")
-        elif trend_dist < -threshold:
-            score += 10
-            reasons.append("Below SMA50")
-            
-        # 3. Volatility Squeeze
-        if bandwidth < 0.10:
-            score += 15
-            reasons.append("Vol Squeeze")
-            if history: history.update_persistence('squeeze')
-            
-        # 4. Volume Flow - UNIVERSITY LOGIC
-        # Priority 1: Ignition (Fresh Breakout)
-        effective_rvol = max(rvol, rvol_5m_avg)
+        # 2. VWAP Check
+        if vwap_value > 0 and price < vwap_value:
+             reasons.append(f"BLOCKED: Below VWAP ({price} < {vwap_value:.2f})")
+             return {'strategies': [], 'reasons': reasons, 'score': 0, 'signal_type': 'NEUTRAL'}
+             
+        # 3. Green Candle Check
+        if open_price > 0 and price <= open_price:
+             reasons.append(f"BLOCKED: Red Candle")
+             return {'strategies': [], 'reasons': reasons, 'score': 0, 'signal_type': 'NEUTRAL'}
+
+        # --- STRATEGY 1: THE SNIPER (v4.0) ---
+        # Strict Squeeze (< 0.15) + High Impact
+        is_sniper_squeeze = bandwidth < 0.15
+        is_sniper_vol = rvol > 1.5
         
-        if effective_rvol > 2.0:
-            score += 30 # Massive Bonus
-            reasons.append(f"IGNITION Vol ({effective_rvol:.1f}x)")
-        elif is_momentum_active and effective_rvol > 0.5:
-             score += 20 # Continuation Bonus
-             reasons.append(f"Momentum Active ({effective_rvol:.1f}x)")
-        elif effective_rvol > 1.5:
-             score += 15
-             reasons.append(f"High Vol ({effective_rvol:.1f}x)")
-            
-        # 5. AI Edge
-        if pred_rv > market_iv * 1.1:
-            edge = (pred_rv - market_iv)
-            score += 20
-            reasons.append(f"AI Edge (+{edge:.1f}%)")
-            
-        # 6. VWAP Reversion
-        if price > vwap_dist:
-             score += 5
+        if is_sniper_squeeze and is_sniper_vol:
+            strategies_triggered.append("SNIPER")
+            reasons.append(f"🎯 SNIPER TRIGGER (BW {bandwidth:.2f}, RVOL {rvol:.1f})")
+            score = 90
+
+        # --- STRATEGY 2: THE GAMMA (v4.2) ---
+        # Tiered Squeeze (< 0.20 for High Priced) + Structure
+        gamma_limit = 0.20 if price > 2000 else 0.15
+        is_gamma_squeeze = bandwidth < gamma_limit
+        # Note: Gamma also requires Green Candle & Structure (Already Checked)
+        # Gamma Trigger: Just needs Squeeze + Structure + Green Candle. RVOL specific not strict but highly recommended.
+        # Let's verify RVOL > 1.5 for Gamma too to avoid vacuum.
+        is_gamma_vol = rvol > 1.5
         
-        # DETERMINE DIRECTION
-        signal_type = "NEUTRAL"
+        if is_gamma_squeeze and is_gamma_vol:
+            # Check if likely already covered by Sniper
+            if "SNIPER" not in strategies_triggered:
+                strategies_triggered.append("GAMMA")
+                reasons.append(f"⚡ GAMMA TRIGGER (BW {bandwidth:.2f}, RVOL {rvol:.1f})")
+                score = max(score, 75)
         
-        # Safety: Force NEUTRAL if trend is weak (ADX < 25)
-        if adx < 25:
-            signal_type = "NEUTRAL"
-        elif price > upper_band or (breakout_lvl > 0 and price > breakout_lvl):
-            signal_type = "LONG"
-        elif price < (upper_band - (upper_band * bandwidth)) or (breakdown_lvl > 0 and price < breakdown_lvl):
-            signal_type = "SHORT"
-            
+        # --- RETURN RESULT ---
+        signal_type = "LONG" if strategies_triggered else "NEUTRAL"
+        
         return {
-            "score": score,
+            "strategies": strategies_triggered,
             "reasons": reasons,
-            "edge": edge,
-            "breakout_lvl": breakout_lvl,
-            "breakdown_lvl": breakdown_lvl,
-            "signal_type": signal_type
+            "score": score,
+            "signal_type": signal_type,
+            "breakout_lvl": 0, # Legacy support
+            "edge": 0 # Legacy support
         }
 
     def get_now(self):
@@ -637,7 +577,22 @@ class LiveBrain:
                         current_vol = hist_df['volume'].iloc[-1]
                         rvol = current_vol / vol_sma if vol_sma > 0 else 0
                         
-                        # logging.info(f"📊 {symbol} Vol: {current_vol}, SMA: {vol_sma}, RVOL: {rvol}")
+                        # --- HTF CONTEXT (Hourly Trend) ---
+                        # Resample to 60min
+                        htf_df = hist_df.resample('60min').agg({
+                            'open':'first', 'high':'max', 'low':'min', 'close':'last'
+                        }).dropna()
+                        
+                        htf_trend = "NEUTRAL"
+                        if len(htf_df) > 20:
+                            htf_sma20 = htf_df['close'].rolling(20).mean().iloc[-1]
+                            curr_h_price = htf_df['close'].iloc[-1]
+                            
+                            # Simple Structure: Price > SMA20
+                            if curr_h_price > htf_sma20:
+                                htf_trend = "BULLISH"
+                            else:
+                                htf_trend = "BEARISH"
 
                         # ...
 
@@ -645,6 +600,20 @@ class LiveBrain:
                         hist_df['hv_10'] = hist_df['log_ret'].rolling(10).std() * np.sqrt(252*375) * 100
                         hist_df['hv_20'] = hist_df['log_ret'].rolling(20).std() * np.sqrt(252*375) * 100
                         
+                        # Calculate Daily Range % (AI Predictor #1)
+                        try:
+                            today_date = hist_df.index[-1].date()
+                            today_df = hist_df[hist_df.index.date == today_date]
+                            if not today_df.empty:
+                                d_high = today_df['high'].max()
+                                d_low = today_df['low'].min()
+                                d_open = today_df['open'].iloc[0]
+                                range_pct = ((d_high - d_low) / d_open) * 100 if d_open > 0 else 0
+                            else:
+                                range_pct = 0.0
+                        except:
+                            range_pct = 0.0
+
                         # Update Market IV Proxy
                         market_iv = hist_df['hv_20'].iloc[-1]
                         
@@ -659,12 +628,27 @@ class LiveBrain:
                         adx = TechnicalIndicators.calculate_adx(hist_df['high'], hist_df['low'], hist_df['close'], window=14)
                         adx_value = adx.iloc[-1] if not adx.empty else 0
                         
-                        # Bollinger Bands
+                        # Bollinger Bands & Bandwidth (Squeeze Metric)
                         upper, lower = TechnicalIndicators.calculate_bollinger_bands(hist_df['close'], period=20, std_dev=2)
                         upper_band = upper.iloc[-1]
                         middle_band = hist_df['close'].rolling(20).mean().iloc[-1]
                         lower_band = lower.iloc[-1]
-                        bandwidth = (upper_band - lower_band) / middle_band if middle_band != 0 else 0
+                        
+                        # Use Library for safety/consistency
+                        bw_series = TechnicalIndicators.calculate_bollinger_bandwidth(hist_df['close'], period=20, std_dev=2)
+                        bandwidth = bw_series.iloc[-1] if not bw_series.empty else 0
+                        
+                        # Market Relative Strength (RS) - Simplified Proxy
+                        # Ideally: Slope(Stock) - Slope(Nifty).
+                        # Proxy: Slope(Stock) over last 60m (12 bars).
+                        # If Slope > 0.05% per candle, it's strong.
+                        relative_strength = 0.0
+                        if len(hist_df) > 12:
+                             p_now = hist_df['close'].iloc[-1]
+                             p_old = hist_df['close'].iloc[-12]
+                             rs_val = (p_now - p_old)/p_old * 100
+                             # Normalize: > 0.5% is Strong
+                             relative_strength = rs_val
                         
                         # VWAP (Intraday)
                         vwap_series = TechnicalIndicators.calculate_vwap(hist_df)
@@ -748,21 +732,14 @@ class LiveBrain:
                     if ignition_mask.any():
                         is_momentum_active = True
 
-                confluence = self.calculate_confluence_score(
-                    symbol, last_price, adx_value, trend_dist, rsi, 
-                    bandwidth, upper_band, rvol, 0, pred_rv, market_iv, focus_data, 
-                    history=self.history[symbol],
-                    rvol_5m_avg=rvol_5m_avg,
-                    is_momentum_active=False,
-                    er_value=er_value,
-                    vol_ratio=vol_ratio,
-                    vwap_value=vwap_value
+                confluence = self.evaluate_strategies(
+                    symbol, last_price, adx_value, trend_dist, 
+                    bandwidth, upper_band, rvol, 0, vwap_value, c_open, focus_data, 
+                    history=self.history[symbol]
                 )
                 
-                raw_score = confluence['score']
-                hist.add_score(raw_score)
-                score = int(hist.get_smoothed_score())
-                
+                score = confluence['score']
+                strategies = confluence['strategies']
                 reasons = confluence['reasons']
                 edge = confluence['edge']
                 breakout_lvl = confluence['breakout_lvl']
@@ -770,93 +747,41 @@ class LiveBrain:
                 signal_type = confluence['signal_type'] 
             else:
                 score = 0
+                strategies = []
                 reasons = ["No Price"]
                 edge = 0.0
                 breakout_lvl = 0.0
                 breakdown_lvl = 0.0
                 signal_type = "NEUTRAL" 
             
-            # LOGGING UNIVERSITY LOGIC FOR USER VISIBILITY
-            if score > 0 or is_momentum_active:
-                state_str = "🔥 IGNITION/ACTIVE" if is_momentum_active else "💤 WAIT"
-                logging.info(f"📊 {symbol} {state_str} | Score: {score} | {reasons}")
+            # LOGGING
+            # Show log if Strategy Triggered or High Score
+            if strategies or score > 60:
+                logging.info(f"📊 {symbol} | Score: {score} | Strategies: {strategies} | {reasons}")
 
             # DECISION LOGIC
             signal = False
             status = "WAIT"
             rejection_reason = f"Score {score}/100: {', '.join(reasons)}"
-            
-            if score < 60:
-                status = "WAIT"
-            elif 60 <= score < 75:
-                status = "STALKING"
-                logging.info(f"👀 Stalking {symbol} (Score {score})...")
-
-                # Brain 1 (Technical) says: BUY (Score >= 75) -> Wait, logic below says check anyway? No, check if >60 for Stalking.
-                # Logic below:
-                
-            # --- PHASE 21: HYBRID BRAIN (Type A + Type B + Type C) ---
-            opt_sentiment, opt_data = self.options_brain.analyze_sentiment(symbol, last_price)
-            logging.info(f"🧠 Options Brain for {symbol}: {opt_sentiment} ({opt_data['reason']})")
-            
-            # Feature Extraction
-            is_breakout = last_price > upper_band
-            is_lower_half = last_price < middle_band # Below SMA20
-            
-            # STRATEGY SELECTION (Hybrid Architecture)
-            # 1. Type A: Breakout (Trend Following)
-            # 2. Type B: Reversion (Mean Reversion in Range)
-            # 3. Type D: Trend Continuation (Catching the Crash)
-            
             selected_strategy = None
             
-            # 1. TYPE A: CLASSIC BREAKOUT (Safety First)
-            if score >= 70 and rvol > 2.5 and is_breakout and opt_sentiment != "BEARISH":
-                selected_strategy = "Type A (Breakout)"
-                
-            # 2. TYPE B: REVERSION MONSTER (Buy the Dip)
-            # Conditions: High Exhaustion Vol (RVOL > 3.0) + Low ADX (< 25)
-            elif score >= 75 and rvol > 3.0 and is_lower_half and opt_sentiment != "BEARISH" and adx_value < 25:
-                selected_strategy = "Type B (Reversion)"
-            
-            # 3. TYPE D: TREND CONTINUATION (Ride the Crash)
-            # Conditions: Moderate Vol (RVOL > 2.0) + High ADX (> 25) -> Force SHORT
-            elif score >= 75 and rvol > 2.0 and is_lower_half and adx_value >= 25:
-                signal_type = "SHORT" # Override for Put Entry
-                selected_strategy = "Type D (Trend Crash)"
-                
-            # 4. TYPE C: GAMMA HUNTER (Disabled - Pending Phase 25)
-            # elif rvol < 1.5 and opt_data.get('ce_vol', 0) > 100000: 
-            #     pass
-                
-            # FILTERING LOGIC
-            if selected_strategy:
-                # Common Filters
-                if signal_type == "LONG" and opt_sentiment == "BEARISH":
-                    status = "FILTERED"
-                    rejection_reason = "Options Bearish in Long Setup"
-                elif signal_type == "SHORT" and opt_sentiment == "BULLISH":
-                    status = "FILTERED"
-                    rejection_reason = "Options Bullish in Short Setup"
-                else: 
-                    # ALL SYSTEMS GO!
-                    verdict = {'decision': "APPROVE", 'confidence': 100, 'reasoning': f"Matched {selected_strategy}"}
+            if strategies:
+                # STRATEGY SELECTION (Priority: SNIPER > GAMMA)
+                if "SNIPER" in strategies:
+                    selected_strategy = "SNIPER"
+                elif "GAMMA" in strategies:
+                    selected_strategy = "GAMMA"
                     
-                    if verdict['decision'] == "APPROVE":
-                        signal = True
-                        status = f"SIGNAL ({selected_strategy})"
-                        rejection_reason = f"APPROVED! {selected_strategy}"
+                # ALL SYSTEMS GO!
+                verdict = {'decision': "APPROVE", 'confidence': 100, 'reasoning': f"Matched {selected_strategy}"}
+                
+                if verdict['decision'] == "APPROVE":
+                    signal = True
+                    status = f"SIGNAL ({selected_strategy})"
+                    rejection_reason = f"APPROVED! {selected_strategy}"
             else:
-                # Detailed Rejection Reason for Logging
-                if rvol < 1.2:
-                    status = "FILTERED"
-                    rejection_reason = f"Low Vol (RVOL {rvol:.2f})"
-                elif not is_breakout and not is_lower_half:
-                     status = "WAIT"
-                     rejection_reason = "Mid-Range (No Setup)"
-                else:
-                    status = "WAIT"
-                    rejection_reason = f"Score {score}/100 (Threshold not met)"
+                status = "WAIT"
+                rejection_reason = "No Strategy Matched"
                     
             llm_conf = "100%"
             
@@ -896,17 +821,17 @@ class LiveBrain:
                     else:
                         entry_data = {
                             "symbol": symbol,
+                            "entry_time": now.strftime("%Y-%m-%d %H:%M:%S"),
+                            "entry_price": last_price,
+                            "quantity": lot_size, 
                             "option_symbol": opt_symbol,
-                            "underlying_price": last_price,
-                            "entry_price": opt_price,
-                            "entry_time": now.strftime('%Y-%m-%d %H:%M:%S'),
-                            "quantity": lot_size * 1,
-                            "lot_size": lot_size,
-                            "strategy": f"Sniper {signal_type}",
+                            "signal_type": signal_type,
+                            "strategy": selected_strategy,
                             "status": "OPEN",
                             "pnl": 0.0,
                             "pnl_pct": 0.0,
                             "high_water_mark": 0.0,
+                            "stop_loss": c_low if 'c_low' in locals() else last_price * 0.99,
                             "last_update": datetime.now().isoformat()
                         }
                         self.tm.add_trade(symbol, entry_data)
@@ -965,26 +890,44 @@ class LiveBrain:
 
                 self.tm.update_trade(symbol, last_price, current_pnl, current_pnl_pct)
                 
-                # Check Exits
-                # 1. Trailing Stop (Activate > 1.5% Option Gain, Trail 0.5%) - Scalping!
-                # Or use Original: Activate > 15%, Trail...
-                
-                # Let's keep original for now:
+                # Check Exits (Multi-Strategy Logic)
+                strategy_tag = trade.get('strategy', 'SNIPER').upper()
                 hwm = self.tm.active_trades[symbol].get('high_water_mark', 0)
                 
-                # Trail Activation: 10%
-                if current_pnl_pct > 0.10:
-                    # Trail by 5%
-                    pass 
-                
-                if hwm > 0.15 and current_pnl_pct < (hwm - 0.05):
-                    logging.info(f"🛑 Trailing Stop Hit for {symbol}!")
-                    self.tm.close_trade(symbol, curr_opt_price, "Trailing Stop")
+                if "SNIPER" in strategy_tag:
+                    # STRATEGY A: SNIPER (Loose Trail)
+                    # Activate at +20%, Trail by 15%
+                    # Hard Stop: -20%
                     
-                # 2. Hard Stop (-10%)
-                elif current_pnl_pct < -0.10:
-                    logging.info(f"💀 Hard Stop Hit for {symbol}!")
-                    self.tm.close_trade(symbol, curr_opt_price, "Hard Stop Loss")
+                    if current_pnl_pct > 0.20:
+                        # Trail
+                        if current_pnl_pct < (hwm - 0.15):
+                            logging.info(f"🛑 Sniper Trail Hit for {symbol} (HWM {hwm:.2%})")
+                            self.tm.close_trade(symbol, curr_opt_price, "Sniper Trail")
+                            
+                    elif current_pnl_pct < -0.20:
+                        logging.info(f"💀 Sniper Hard Stop Hit for {symbol} (-20%)")
+                        self.tm.close_trade(symbol, curr_opt_price, "Sniper Hard Stop")
+                        
+                elif "GAMMA" in strategy_tag:
+                    # STRATEGY B: GAMMA (Tight Breathing Room)
+                    # Activate at +10%, Trail by 5%
+                    # Hard Stop: -10%
+                    
+                    if current_pnl_pct > 0.10:
+                        # Trail
+                        if current_pnl_pct < (hwm - 0.05):
+                            logging.info(f"🛑 Gamma Trail Hit for {symbol} (HWM {hwm:.2%})")
+                            self.tm.close_trade(symbol, curr_opt_price, "Gamma Trail")
+                            
+                    elif current_pnl_pct < -0.10:
+                        logging.info(f"💀 Gamma Hard Stop Hit for {symbol} (-10%)")
+                        self.tm.close_trade(symbol, curr_opt_price, "Gamma Hard Stop")
+                
+                else: 
+                     # Fallback (Standard)
+                     if current_pnl_pct < -0.10:
+                         self.tm.close_trade(symbol, curr_opt_price, "Hard Stop")
         
         # Save latest_scan.json for WhatsApp Scheduler
         # Save latest_scan.json
