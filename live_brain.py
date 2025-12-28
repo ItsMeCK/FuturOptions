@@ -340,6 +340,12 @@ class LiveBrain:
                     self.scan_market()
                     continue
                     
+                # Weekend Check (Sat=5, Sun=6)
+                if now.weekday() >= 5:
+                    logging.info(f"📅 Weekend ({now.strftime('%A')}). Market Closed. Sleeping...")
+                    time.sleep(3600) # Sleep 1 Hour
+                    continue
+                    
                 # Market Closed Logic
                 market_open = start_time <= current_time <= end_time
                 
@@ -710,24 +716,31 @@ class LiveBrain:
                 rejection_reason = "Quote Missing"
 
             # 3. INSTITUTIONAL CONFLUENCE SCORE (0-100)
-            if last_price > 0:
+            if last_price > 0 and hist_df is not None and not hist_df.empty:
                 hist = self.history[symbol]
+                
+                # Verify Index
+                if not isinstance(hist_df.index, pd.DatetimeIndex):
+                     try:
+                         hist_df['date'] = pd.to_datetime(hist_df['date'])
+                         hist_df.set_index('date', inplace=True)
+                     except:
+                         pass
+
                 # Momentum State (University Logic)
-                # Check last 5 candles (excluding current forming one at -1) for Ignition
                 is_momentum_active = False
-                if len(hist_df) > 6:
+                
+                # Safe access to 'upper' - it is a Series from TechnicalIndicators
+                # Make sure 'upper' exists in local scope. It was calculated in the try block above.
+                if 'upper' in locals() and len(hist_df) > 6:
                     # Recalculate rolling series for context
-                    # Note: vol_sma is a scalar at -1. We need series.
                     vol_sma_series = hist_df['volume'].rolling(20).mean()
                     rvol_series = hist_df['volume'] / vol_sma_series
                     
-                    # Slice: Last 5 COMPLETED candles (-6 to -1)
-                    # Actually just check lookback window=5
                     window_close = hist_df['close'].iloc[-6:-1]
-                    window_upper = upper.iloc[-6:-1]
+                    window_upper = upper.iloc[-6:-1] # Now safe
                     window_rvol = rvol_series.iloc[-6:-1]
                     
-                    # Condition: Close > Upper AND RVOL > 2.0
                     ignition_mask = (window_close > window_upper) & (window_rvol > 2.0)
                     if ignition_mask.any():
                         is_momentum_active = True
