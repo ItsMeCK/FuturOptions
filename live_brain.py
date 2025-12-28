@@ -810,8 +810,23 @@ class LiveBrain:
                 else:
                     option_type = "CE" if signal_type == "LONG" else "PE"
                 
-                    # 1. Get Option Symbol & Price
-                    opt_symbol, strike = self.fetcher.get_option_symbol(symbol, last_price, option_type)
+                    # Risk Geometry: Calculate ATR Stop
+                    atr_series = TechnicalIndicators.calculate_atr(hist_df['high'], hist_df['low'], hist_df['close'])
+                    atr_val = atr_series.iloc[-1]
+                    # Stop is always below for Longs (we only do Long calls for now)
+                    # If we did Puts, we'd need logic. Assuming Long Call for Long Signal.
+                    # Wait, if signal_type is "SHORT", we buy PE. Stop should be ABOVE price?
+                    # No, we buy PE. If underlying goes UP, PE goes down.
+                    # So for PE, Stop is if Underlying > Entry + 2*ATR.
+                    if signal_type == "LONG":
+                        atr_stop = last_price - (2.0 * atr_val)
+                    else:
+                        atr_stop = last_price + (2.0 * atr_val)
+                    
+                    logging.info(f"🛡️ Risk Geometry: ATR={atr_val:.2f} | Stop Level={atr_stop:.2f}")
+
+                    # 1. Get Option Symbol & Price (Strategy Aware)
+                    opt_symbol, strike = self.fetcher.get_option_symbol(symbol, last_price, option_type, strategy=selected_strategy)
                     lot_size = self.fetcher.get_lot_size(symbol)
                     
                     # Fetch Option Quote
@@ -844,7 +859,7 @@ class LiveBrain:
                             "pnl": 0.0,
                             "pnl_pct": 0.0,
                             "high_water_mark": 0.0,
-                            "stop_loss": c_low if 'c_low' in locals() else last_price * 0.99,
+                            "stop_loss": atr_stop,
                             "last_update": datetime.now().isoformat()
                         }
                         self.tm.add_trade(symbol, entry_data)
@@ -871,76 +886,90 @@ class LiveBrain:
         # Post-Loop: Save Scan Result for WhatsApp Notification
             
 
-        for symbol in focus_list:
-            # 4. Manage Active Trades (New Indentation Level - actually wait, the loop above was single iteration per symbol)
-            # My previous view showed the loop ends after appending to scan_results?
-            # Im misreading the indentation.
-            pass
+        
+        # 4. Manage Active Trade (Current Symbol)
+        # BUG FIX: Removed redundant loop that caused stale price usage.
+        # Now we only manage the trade for the CURRENT symbol in the scan loop.
+        if symbol in self.tm.active_trades:
+            trade = self.tm.active_trades[symbol]
             
-            # 4. Manage Active Trades
-            if symbol in self.tm.active_trades:
-                trade = self.tm.active_trades[symbol]
-                # PnL Calc based on Underlying Move approx (Delta 0.5) because sim fetching option PnL is complex 
-                # (Need to fetch option quote every loop for active trades)
-                
-                # Ideally:
-                opt_sym = trade.get('option_symbol')
-                curr_opt_price = trade.get('entry_price') 
-                entry_opt_price = trade.get('entry_price')
-                qty = trade.get('quantity')
-                
-                # Fetch Current Option Price
-                try:
-                    nfo_opt_sym = f"NFO:{opt_sym}"
-                    q = self.fetcher.fetch_live_quote([nfo_opt_sym])
-                    if nfo_opt_sym in q:
-                        curr_opt_price = q[nfo_opt_sym]['last_price']
-                except Exception as e:
-                    logging.error(f"Failed to fetch live P&L for {opt_sym}: {e}")
-                
-                current_pnl = (curr_opt_price - entry_opt_price) * qty
-                current_pnl_pct = (curr_opt_price - entry_opt_price) / entry_opt_price if entry_opt_price > 0 else 0
+            opt_sym = trade.get('option_symbol')
+            curr_opt_price = trade.get('entry_price') 
+            entry_opt_price = trade.get('entry_price') 
+            qty = trade.get('quantity')
+            
+            # Fetch Current Option Price
+            try:
+                nfo_opt_sym = f"NFO:{opt_sym}"
+                q = self.fetcher.fetch_live_quote([nfo_opt_sym])
+                if nfo_opt_sym in q:
+                    curr_opt_price = q[nfo_opt_sym]['last_price']
+            except Exception as e:
+                logging.error(f"Failed to fetch live P&L for {opt_sym}: {e}")
+            
+            current_pnl = (curr_opt_price - entry_opt_price) * qty
+            current_pnl_pct = (curr_opt_price - entry_opt_price) / entry_opt_price if entry_opt_price > 0 else 0
 
-                self.tm.update_trade(symbol, last_price, current_pnl, current_pnl_pct)
+            self.tm.update_trade(symbol, last_price, current_pnl, current_pnl_pct)
+            
+            # --- v10.0 RISK GEOMETRY EXITS ---
+            
+            # A. Time Decay Kill Switch (30 mins > 5% ROI needed)
+            entry_time_str = trade.get('entry_time')
+            if entry_time_str:
+                entry_dt = datetime.strptime(entry_time_str, "%Y-%m-%d %H:%M:%S")
+                duration_mins = (now - entry_dt).total_seconds() / 60
                 
-                # Check Exits (Multi-Strategy Logic)
+                # If trade is older than 30 mins and ROI is less than 5% -> KILL
+                # This saves us from Theta Bleed on stagnant trades.
+                if duration_mins > 30 and current_pnl_pct < 0.05:
+                    logging.info(f"💀 Time Kill: {symbol} stagnant for {duration_mins:.0f}m ({current_pnl_pct:.2%}). Evicting.")
+                    self.tm.close_trade(symbol, curr_opt_price, "Time Decay Kill")
+                    # Continue to next symbol (since trade closed)
+                    # continue # Can't continue inside this block easily, just use else logic
+            
+            # B. ATR Hard Stop (Underlying Price)
+            # Only if trade is still open
+            if symbol in self.tm.active_trades:
+                atr_stop_level = trade.get('stop_loss', 0)
+                if atr_stop_level > 0:
+                     # Check if Price crossed Stop
+                     if trade.get('signal_type') == "LONG":
+                         if last_price < atr_stop_level:
+                             logging.info(f"🛡️ ATR Stop Hit: {symbol} {last_price} < {atr_stop_level}")
+                             self.tm.close_trade(symbol, curr_opt_price, "ATR Hard Stop")
+                     elif trade.get('signal_type') == "SHORT":
+                         if last_price > atr_stop_level:
+                             logging.info(f"🛡️ ATR Stop Hit: {symbol} {last_price} > {atr_stop_level}")
+                             self.tm.close_trade(symbol, curr_opt_price, "ATR Hard Stop")
+
+            # --- OLD STRATEGY EXITS (Trails) ---
+            if symbol in self.tm.active_trades:
                 strategy_tag = trade.get('strategy', 'SNIPER').upper()
                 hwm = self.tm.active_trades[symbol].get('high_water_mark', 0)
                 
                 if "SNIPER" in strategy_tag:
                     # STRATEGY A: SNIPER (Loose Trail)
-                    # Activate at +20%, Trail by 15%
-                    # Hard Stop: -20%
-                    
                     if current_pnl_pct > 0.20:
-                        # Trail
                         if current_pnl_pct < (hwm - 0.15):
                             logging.info(f"🛑 Sniper Trail Hit for {symbol} (HWM {hwm:.2%})")
                             self.tm.close_trade(symbol, curr_opt_price, "Sniper Trail")
                             
                     elif current_pnl_pct < -0.20:
-                        logging.info(f"💀 Sniper Hard Stop Hit for {symbol} (-20%)")
-                        self.tm.close_trade(symbol, curr_opt_price, "Sniper Hard Stop")
+                         # Fallback Hard Stop (if ATR didn't catch it?)
+                         logging.info(f"💀 Sniper Hard Stop Hit for {symbol} (-20%)")
+                         self.tm.close_trade(symbol, curr_opt_price, "Sniper Fixed Stop")
                         
                 elif "GAMMA" in strategy_tag:
                     # STRATEGY B: GAMMA (Tight Breathing Room)
-                    # Activate at +10%, Trail by 5%
-                    # Hard Stop: -10%
-                    
                     if current_pnl_pct > 0.10:
-                        # Trail
                         if current_pnl_pct < (hwm - 0.05):
-                            logging.info(f"🛑 Gamma Trail Hit for {symbol} (HWM {hwm:.2%})")
-                            self.tm.close_trade(symbol, curr_opt_price, "Gamma Trail")
+                             logging.info(f"🛑 Gamma Trail Hit for {symbol} (HWM {hwm:.2%})")
+                             self.tm.close_trade(symbol, curr_opt_price, "Gamma Trail")
                             
                     elif current_pnl_pct < -0.10:
                         logging.info(f"💀 Gamma Hard Stop Hit for {symbol} (-10%)")
-                        self.tm.close_trade(symbol, curr_opt_price, "Gamma Hard Stop")
-                
-                else: 
-                     # Fallback (Standard)
-                     if current_pnl_pct < -0.10:
-                         self.tm.close_trade(symbol, curr_opt_price, "Hard Stop")
+                        self.tm.close_trade(symbol, curr_opt_price, "Gamma Fixed Stop")
         
         # Save latest_scan.json for WhatsApp Scheduler
         # Save latest_scan.json

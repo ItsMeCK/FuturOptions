@@ -187,10 +187,13 @@ class ZerodhaDataFetcher:
         except Exception as e:
             print(f"❌ Failed to fetch NFO Dump: {e}")
 
-    def get_option_symbol(self, symbol, spot_price, option_type="CE"):
+    def get_option_symbol(self, symbol, spot_price, option_type="CE", strategy="GAMMA"):
         """
         Construct Zerodha Option Symbol using SMART LOOKUP (Instrument Dump).
         Finds the actual nearest strike from the exchange list.
+        Strategy Specifics:
+        - GAMMA: ATM (Target = Spot)
+        - SNIPER: OTM (Target = Spot + 2%) for Leverage
         """
         try:
             # 1. Ensure Dump is Cached
@@ -202,7 +205,6 @@ class ZerodhaDataFetcher:
                 return None, 0
 
             # 2. Filter for Symbol
-            # Optimize: Maybe cache per-symbol subset? For now, boolean mask is fast enough for 40k rows.
             subset = self.nfo_df[self.nfo_df['name'] == symbol]
             
             if subset.empty:
@@ -210,8 +212,6 @@ class ZerodhaDataFetcher:
                 return None, 0
                 
             # 3. Filter for Expiry (>= Today)
-            # We want the NEAREST future expiry.
-            # Handles "today is expiry" case correctly (>= includes today).
             now = datetime.now()
             future_opt = subset[subset['expiry'] >= now]
             
@@ -228,14 +228,23 @@ class ZerodhaDataFetcher:
             ]
             
             if candidates.empty:
-                print(f"⚠️ Smart Lookup: No {option_type} candidates for {symbol} on {nearest_expiry.date()}")
-                return None, 0
-                
-            # 5. Find Nearest Strike
-            # (candidate_strike - spot).abs().min()
-            candidates = candidates.copy() # Avoid SettingWithCopyWarning
-            candidates['diff'] = (candidates['strike'] - spot_price).abs()
-            
+                 print(f"⚠️ Smart Lookup: No {option_type} candidates for {symbol} on {nearest_expiry.date()}")
+                 return None, 0
+
+            # 5. Strike Selection Logic (Strategy Based)
+            if strategy == "SNIPER":
+                # OTM Logic (2% Out)
+                if option_type == "CE":
+                    target_strike = spot_price * 1.02 # Call OTM
+                else:
+                    target_strike = spot_price * 0.98 # Put OTM
+            else:
+                # GAMMA (Default): ATM
+                target_strike = spot_price
+
+            # Find Nearest Strike to Target
+            candidates = candidates.copy()
+            candidates['diff'] = (candidates['strike'] - target_strike).abs()
             best_match = candidates.nsmallest(1, 'diff').iloc[0]
             
             return best_match['tradingsymbol'], best_match['strike']
