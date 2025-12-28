@@ -549,6 +549,9 @@ class LiveBrain:
                     hist_df = self.fetcher.fetch_latest_data(token, days=5, interval="5minute")
                     
                     if hist_df is not None and not hist_df.empty:
+                        # Log Initialization (First time only to avoid spam)
+                        if symbol not in self.last_processed_candle:
+                             logging.info(f"📚 {symbol}: Initialized 5-Day History ({len(hist_df)} candles)")
                         # NEW CANDLE CHECK
                         last_candle_time = hist_df.index[-1]
                         
