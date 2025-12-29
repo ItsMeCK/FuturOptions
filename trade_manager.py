@@ -61,7 +61,9 @@ class TradeManager:
                 symbol, 
                 entry_data.get('strategy', 'Unknown'), 
                 entry_data.get('entry_price'), 
-                "Signal Detected"
+                "Signal Detected",
+                option_symbol=entry_data.get('option_symbol'),
+                signal_type=entry_data.get('signal_type', 'LONG')
             )
         except Exception as e:
             print(f"⚠️ Notification Failed: {e}")

@@ -43,13 +43,17 @@ class EmailBot:
         except Exception as e:
             print(f"❌ Email Failed: {e}")
 
-    def send_trade_alert(self, symbol, strategy, price, reason):
-        subject = f"🚀 BUY ALERT: {symbol} [{strategy}]"
+    def send_trade_alert(self, symbol, strategy, price, reason, option_symbol=None, signal_type="LONG"):
+        direction = "CE" if signal_type == "LONG" else "PE"
+        opt_text = option_symbol if option_symbol else f"{symbol} {direction}"
+        
+        subject = f"🚀 BUY {direction}: {symbol} [{strategy}]"
         body = f"""🚀 Trade Triggered!
 
 Symbol: {symbol}
+Option: {opt_text}
 Strategy: {strategy}
-Entry: {price}
+Entry Underlying: {price}
 Trigger: {reason}
 
 System: v10.0 Risk Geometry
