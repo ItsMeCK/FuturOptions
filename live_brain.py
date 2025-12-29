@@ -549,31 +549,32 @@ class LiveBrain:
                     hist_df = self.fetcher.fetch_latest_data(token, days=5, interval="5minute")
                     
                     if hist_df is not None and not hist_df.empty:
+                        # Fix: Ensure Date Index for Technical Lib (Resolves RangeIndex Error)
+                        if 'date' in hist_df.columns:
+                            hist_df['date'] = pd.to_datetime(hist_df['date'])
+                            hist_df.set_index('date', inplace=True)
+                        
                         # Log Initialization (First time only to avoid spam)
                         if symbol not in self.last_processed_candle:
                              logging.info(f"📚 {symbol}: Initialized 5-Day History ({len(hist_df)} candles)")
+                        
                         # NEW CANDLE CHECK
                         last_candle_time = hist_df.index[-1]
                         
-
                         # Mark this candle as processed
                         self.last_processed_candle[symbol] = last_candle_time
-                        
-                        # Use the candle as is (It is the latest completed candle)
-                        # We do NOT drop the last row here because we are gating by timestamp uniqueness.
-                        # If API returns forming candle, we might trade early, but deduplication prevents re-trading same candle.
-                        # Ideally we want COMPLETED candle. 
-                        # Assuming Zerodha Historical returns completed or we accept the slight noise of forming 5-min count.
                         
                         # Calculate Features
                         # Debug: Check Data Integrity
                         if not hist_df.empty:
-                             # logging.info(f"🐛 {symbol} Data Head: {hist_df.head(1).to_dict()}")
                              if 'volume' not in hist_df.columns:
                                  logging.error(f"❌ {symbol}: 'volume' column missing! Cols: {hist_df.columns}")
                         
                         hist_df['close'] = hist_df['close']
                         hist_df['log_ret'] = np.log(hist_df['close'] / hist_df['close'].shift(1))
+                        
+                        # Define c_open (Current Candle Open) for downstream logic
+                        c_open = hist_df['open'].iloc[-1]
                         # ... rest of calc ...
 
                         # ...
