@@ -904,6 +904,7 @@ class LiveBrain:
                             "symbol": symbol,
                             "entry_time": now.strftime("%Y-%m-%d %H:%M:%S"),
                             "entry_price": last_price,
+                            "entry_option_price": opt_price, # Fix: Store actual option entry price
                             "quantity": lot_size, 
                             "option_symbol": opt_symbol,
                             "signal_type": signal_type,
@@ -952,8 +953,14 @@ class LiveBrain:
                      continue
 
                 opt_sym = trade.get('option_symbol')
-                curr_opt_price = trade.get('entry_price') 
-                entry_opt_price = trade.get('entry_price') 
+                
+                # P&L Calculation Fix (v10.5): Use Option Price, not Stock Price
+                entry_opt_price = trade.get('entry_option_price') 
+                if not entry_opt_price: 
+                    # Fallback for old trades (or if logic failed), but try to infer or use underlying as last resort (will likely fail PnL)
+                    entry_opt_price = trade.get('entry_price') 
+
+                curr_opt_price = entry_opt_price # Default to entry if live fetch fails
                 qty = trade.get('quantity')
                 
                 # Fetch Current Option Price
