@@ -108,20 +108,7 @@ def simulate_today():
             today_mask = hist_df.index.strftime('%Y-%m-%d') == today_str
             indices = hist_df.index[today_mask]
             
-            if "HFCL" in symbol:
-                 print(f"🧐 HFCL Data Loaded: {len(indices)} candles for {today_str}")
-            
-            if len(indices) == 0:
-                 # print(f"No Data Dec 29 for {symbol}")
-                 continue
-            
             for ts in indices:
-                # DEBUG HFCL
-                if "HFCL" in symbol:
-                     # Get scalar preview
-                     _bw = bw_series.loc[ts]
-                     print(f"🧐 HFCL RAW: {ts.time()} BW={_bw:.4f}")
-
                 # Get scalar values at this timestamp
                 price = hist_df.loc[ts]['close']
                 open_p = hist_df.loc[ts]['open']
@@ -144,14 +131,14 @@ def simulate_today():
                 
                 # 0. Global Filters (Safety)
                 if ts.time() < datetime.strptime("09:30", "%H:%M").time(): continue # Time Filter
-                if curr_bw < 0.03: continue # Dead Zone Filter
+                if curr_bw < 0.005: continue # Dead Zone Filter (v14.2: 0.5% for Large Caps)
                 
                 strategy = None
                 signal_type = None
                 
                 # Branch A: Bullish (Price > SMA)
-                if "HFCL" in symbol:
-                     print(f"🧐 HFCL Check: Time={ts.time()} Price={price} SMA={curr_sma} TrendDist={trend_dist}")
+                if symbol in ["HFCL", "TATASTEEL", "JSWSTEEL"]:
+                     print(f"🧐 {symbol} Check: Time={ts.time()} Price={price} SMA={curr_sma} TrendDist={trend_dist} BW={curr_bw} RV={curr_rvol}")
 
                 if trend_dist > 0:
                     # Long Gatekeepers

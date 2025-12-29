@@ -245,9 +245,8 @@ class LiveBrain:
         score = 0
         
         # --- GLOBAL FILTER (Applies to ALL) ---
-        # 4. Filter Dead Zones (Low Volatility)
-        if bandwidth < 0.03:
-             reasons.append(f"BLOCKED: Dead Zone (BW {bandwidth:.3f} < 0.03)")
+        if bandwidth < 0.005:
+             reasons.append(f"BLOCKED: Dead Zone (BW {bandwidth:.3f} < 0.005)")
              return {
                 'strategies': [], 
                 'reasons': reasons, 
