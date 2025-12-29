@@ -528,6 +528,11 @@ class LiveBrain:
             vwap_value = 0.0
             rvol = 0.0
             
+            # Fix: Initialize Variables used in Collection Scope (v10.2 Hotfix)
+            edge = 0.0
+            breakout_lvl = 0.0
+            breakdown_lvl = 0.0
+            
             llm_conf = "-"
             llm_decision = "-"
             
