@@ -283,6 +283,19 @@ class LiveBrain:
                 'breakdown_lvl': 0,
                 'edge': 0
              }
+             
+        # 4. Filter Dead Zones (Low Volatility)
+        if bandwidth < 0.03:
+             reasons.append(f"BLOCKED: Dead Zone (BW {bandwidth:.3f} < 0.03)")
+             return {
+                'strategies': [], 
+                'reasons': reasons, 
+                'score': 0, 
+                'signal_type': 'NEUTRAL',
+                'breakout_lvl': 0,
+                'breakdown_lvl': 0,
+                'edge': 0
+             }
 
         # --- STRATEGY 1: THE SNIPER (v4.0) ---
         # Strict Squeeze (< 0.15) + High Impact
@@ -357,7 +370,8 @@ class LiveBrain:
                     
                 current_time = now.time()
                 
-                start_time = datetime.strptime("09:00", "%H:%M").time()
+                # UPDATE: Start Scanning at 09:30 to avoid Morning Chop
+                start_time = datetime.strptime("09:30", "%H:%M").time()
                 end_time = datetime.strptime("15:30", "%H:%M").time()
                 
                 # Simulation Mode Bypass
@@ -1014,14 +1028,16 @@ class LiveBrain:
                     hwm = self.tm.active_trades[symbol].get('high_water_mark', 0)
                     
                     if "SNIPER" in strategy_tag:
-                        # STRATEGY A: SNIPER (Loose Trail)
-                        if current_pnl_pct > 0.20:
-                            if current_pnl_pct < (hwm - 0.15):
-                                logging.info(f"🛑 Sniper Trail Hit for {symbol} (HWM {hwm:.2%})")
+                        # STRATEGY A: SNIPER (User Defined: 30% Activation / 10% Trail)
+                        # Activation: +30%
+                        if current_pnl_pct > 0.30:
+                            # Trail: HWM - 10%
+                            if current_pnl_pct < (hwm - 0.10):
+                                logging.info(f"🛑 Sniper Trail Hit for {symbol} (HWM {hwm:.2%} - 10%)")
                                 self.tm.close_trade(symbol, curr_opt_price, "Sniper Trail")
                                 
                         elif current_pnl_pct < -0.20:
-                             # Fallback Hard Stop (if ATR didn't catch it?)
+                             # Hard Stop: -20%
                              logging.info(f"💀 Sniper Hard Stop Hit for {symbol} (-20%)")
                              self.tm.close_trade(symbol, curr_opt_price, "Sniper Fixed Stop")
                             
