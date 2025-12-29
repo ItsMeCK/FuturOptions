@@ -2,13 +2,14 @@ import json
 import os
 from datetime import datetime
 
-from notifications.whatsapp_bot import WhatsAppBot
+# Switched to Email Bot (v11.0)
+from notifications.email_bot import EmailBot
 
 class TradeManager:
     def __init__(self, state_file="active_trades.json"):
         self.state_file = state_file
         self.active_trades = {}
-        self.bot = WhatsAppBot() # Initialize Bot
+        self.bot = EmailBot() # Initialize Email Bot
         self.load_state()
 
     def load_active_trades(self):
@@ -110,16 +111,21 @@ class TradeManager:
         return False
 
     def log_closed_trade(self, trade):
-        """Append closed trade to a permanent CSV log."""
-        file_exists = os.path.exists("trade_history.csv")
+        """Append closed trade to a DAILY CSV log."""
+        today_str = datetime.now().strftime("%Y-%m-%d")
+        folder = "trade_history"
+        os.makedirs(folder, exist_ok=True)
+        filename = f"{folder}/trades_{today_str}.csv"
+        
+        file_exists = os.path.exists(filename)
         try:
-            with open("trade_history.csv", "a") as f:
-                # Simple CSV format
+            with open(filename, "a") as f:
+                # Simple CSV format with Strategy column
                 if not file_exists:
-                    f.write("Symbol,EntryTime,EntryPrice,ExitTime,ExitPrice,PnL,Reason\n")
+                    f.write("Symbol,EntryTime,EntryPrice,ExitTime,ExitPrice,PnL,Reason,Strategy\n")
                 
                 line = f"{trade.get('symbol')},{trade.get('entry_time')},{trade.get('entry_price')}," \
-                       f"{trade.get('exit_time')},{trade.get('exit_price')},{trade.get('pnl')},{trade.get('exit_reason')}\n"
+                       f"{trade.get('exit_time')},{trade.get('exit_price')},{trade.get('pnl')},{trade.get('exit_reason')},{trade.get('strategy', 'Unknown')}\n"
                 f.write(line)
         except Exception as e:
             print(f"❌ Error logging to CSV: {e}")

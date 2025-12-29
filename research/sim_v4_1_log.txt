@@ -1,0 +1,87 @@
+🧪 SIMULATION: v4.1 Dynamic Squeeze & Impulse Exits (Dec 24 & 26)...
+👉 ENTRY 1: ADANIGREEN @ 11:20 | BW: 0.005 (Limit: nan) | TIGHT
+👉 ENTRY 2: ADANIPORTS @ 11:30 | BW: 0.005 (Limit: nan) | TIGHT
+👉 ENTRY 3: AMBUJACEM @ 11:30 | BW: 0.004 (Limit: nan) | TIGHT
+👉 ENTRY 4: APOLLOHOSP @ 10:55 | BW: 0.018 (Limit: nan) | TIGHT
+👉 ENTRY 5: BANKBARODA @ 12:15 | BW: 0.003 (Limit: nan) | TIGHT
+👉 ENTRY 6: BDL @ 11:05 | BW: 0.042 (Limit: nan) | TIGHT
+👉 ENTRY 7: BDL @ 14:15 | BW: 0.006 (Limit: 0.007) | TIGHT
+👉 ENTRY 8: BEL @ 11:25 | BW: 0.004 (Limit: nan) | TIGHT
+👉 ENTRY 9: BOSCHLTD @ 11:20 | BW: 0.003 (Limit: nan) | TIGHT
+👉 ENTRY 10: CHOLAFIN @ 13:55 | BW: 0.003 (Limit: 0.004) | TIGHT
+👉 ENTRY 11: COLPAL @ 11:20 | BW: 0.003 (Limit: nan) | TIGHT
+👉 ENTRY 12: DIVISLAB @ 12:15 | BW: 0.004 (Limit: nan) | TIGHT
+👉 ENTRY 13: DRREDDY @ 12:00 | BW: 0.005 (Limit: nan) | TIGHT
+👉 ENTRY 14: EICHERMOT @ 12:00 | BW: 0.008 (Limit: nan) | TIGHT
+👉 ENTRY 15: EICHERMOT @ 14:05 | BW: 0.003 (Limit: 0.003) | TIGHT
+👉 ENTRY 16: ETERNAL @ 14:10 | BW: 0.004 (Limit: 0.004) | TIGHT
+👉 ENTRY 17: GLENMARK @ 14:05 | BW: 0.003 (Limit: 0.003) | TIGHT
+👉 ENTRY 18: GMRAIRPORT @ 11:05 | BW: 0.010 (Limit: nan) | TIGHT
+👉 ENTRY 19: GRASIM @ 11:10 | BW: 0.007 (Limit: nan) | TIGHT
+👉 ENTRY 20: HAL @ 12:05 | BW: 0.005 (Limit: nan) | TIGHT
+👉 ENTRY 21: HAL @ 12:30 | BW: 0.004 (Limit: 0.004) | TIGHT
+👉 ENTRY 22: HDFCLIFE @ 10:55 | BW: 0.004 (Limit: nan) | TIGHT
+👉 ENTRY 23: HINDALCO @ 12:05 | BW: 0.010 (Limit: nan) | TIGHT
+👉 ENTRY 24: HINDZINC @ 12:05 | BW: 0.005 (Limit: nan) | TIGHT
+👉 ENTRY 25: INDHOTEL @ 11:35 | BW: 0.002 (Limit: nan) | TIGHT
+👉 ENTRY 26: INDIANB @ 15:20 | BW: 0.004 (Limit: 0.005) | TIGHT
+👉 ENTRY 27: INDUSINDBK @ 11:00 | BW: 0.012 (Limit: nan) | TIGHT
+👉 ENTRY 28: INDUSTOWER @ 14:30 | BW: 0.005 (Limit: 0.005) | TIGHT
+👉 ENTRY 29: INFY @ 11:55 | BW: 0.006 (Limit: nan) | TIGHT
+👉 ENTRY 30: INFY @ 14:00 | BW: 0.001 (Limit: 0.001) | TIGHT
+👉 ENTRY 31: JUBLFOOD @ 11:55 | BW: 0.005 (Limit: nan) | TIGHT
+👉 ENTRY 32: JUBLFOOD @ 12:15 | BW: 0.006 (Limit: nan) | TIGHT
+👉 ENTRY 33: KALYANKJIL @ 10:55 | BW: 0.005 (Limit: nan) | TIGHT
+👉 ENTRY 34: KOTAKBANK @ 10:55 | BW: 0.005 (Limit: nan) | TIGHT
+👉 ENTRY 35: LICHSGFIN @ 12:20 | BW: 0.004 (Limit: nan) | TIGHT
+👉 ENTRY 36: LUPIN @ 14:10 | BW: 0.002 (Limit: 0.003) | TIGHT
+👉 ENTRY 37: MARUTI @ 11:05 | BW: 0.009 (Limit: nan) | TIGHT
+👉 ENTRY 38: MAZDOCK @ 11:30 | BW: 0.018 (Limit: nan) | TIGHT
+👉 ENTRY 39: MFSL @ 11:20 | BW: 0.006 (Limit: nan) | TIGHT
+👉 ENTRY 40: NATIONALUM @ 12:00 | BW: 0.009 (Limit: nan) | TIGHT
+👉 ENTRY 41: NESTLEIND @ 11:25 | BW: 0.004 (Limit: nan) | TIGHT
+👉 ENTRY 42: NESTLEIND @ 11:55 | BW: 0.005 (Limit: nan) | TIGHT
+👉 ENTRY 43: NMDC @ 12:05 | BW: 0.006 (Limit: nan) | TIGHT
+👉 ENTRY 44: PAGEIND @ 12:00 | BW: 0.008 (Limit: nan) | TIGHT
+👉 ENTRY 45: PETRONET @ 11:30 | BW: 0.006 (Limit: nan) | TIGHT
+👉 ENTRY 46: PGEL @ 11:45 | BW: 0.009 (Limit: nan) | TIGHT
+👉 ENTRY 47: PIIND @ 12:10 | BW: 0.003 (Limit: nan) | TIGHT
+👉 ENTRY 48: PNB @ 11:55 | BW: 0.004 (Limit: nan) | TIGHT
+👉 ENTRY 49: POLYCAB @ 13:10 | BW: 0.003 (Limit: 0.003) | TIGHT
+👉 ENTRY 50: POWERGRID @ 11:40 | BW: 0.006 (Limit: nan) | TIGHT
+👉 ENTRY 51: POWERGRID @ 11:55 | BW: 0.006 (Limit: nan) | TIGHT
+👉 ENTRY 52: POWERINDIA @ 11:35 | BW: 0.008 (Limit: nan) | TIGHT
+👉 ENTRY 53: PRESTIGE @ 12:00 | BW: 0.013 (Limit: nan) | TIGHT
+👉 ENTRY 54: RECLTD @ 12:15 | BW: 0.002 (Limit: nan) | TIGHT
+👉 ENTRY 55: SAIL @ 12:05 | BW: 0.008 (Limit: nan) | TIGHT
+👉 ENTRY 56: SBICARD @ 11:20 | BW: 0.011 (Limit: nan) | TIGHT
+👉 ENTRY 57: SBILIFE @ 11:15 | BW: 0.002 (Limit: nan) | TIGHT
+👉 ENTRY 58: SBILIFE @ 11:45 | BW: 0.004 (Limit: nan) | TIGHT
+👉 ENTRY 59: SHREECEM @ 11:25 | BW: 0.004 (Limit: nan) | TIGHT
+👉 ENTRY 60: SIEMENS @ 11:50 | BW: 0.003 (Limit: nan) | TIGHT
+👉 ENTRY 61: SONACOMS @ 11:35 | BW: 0.010 (Limit: nan) | TIGHT
+👉 ENTRY 62: SRF @ 13:25 | BW: 0.004 (Limit: 0.004) | TIGHT
+👉 ENTRY 63: SUNPHARMA @ 14:20 | BW: 0.002 (Limit: 0.003) | TIGHT
+👉 ENTRY 64: TECHM @ 13:55 | BW: 0.002 (Limit: 0.002) | TIGHT
+👉 ENTRY 65: TITAGARH @ 12:25 | BW: 0.011 (Limit: 0.012) | TIGHT
+👉 ENTRY 66: TORNTPHARM @ 11:45 | BW: 0.004 (Limit: nan) | TIGHT
+👉 ENTRY 67: TRENT @ 11:55 | BW: 0.008 (Limit: nan) | TIGHT
+👉 ENTRY 68: ULTRACEMCO @ 11:00 | BW: 0.002 (Limit: nan) | TIGHT
+👉 ENTRY 69: UNOMINDA @ 11:05 | BW: 0.010 (Limit: nan) | TIGHT
+👉 ENTRY 70: VBL @ 15:00 | BW: 0.004 (Limit: 0.004) | TIGHT
+👉 ENTRY 71: VBL @ 15:20 | BW: 0.003 (Limit: 0.004) | TIGHT
+👉 ENTRY 71: VEDL @ 11:00 | BW: 0.005 (Limit: nan) | TIGHT
+👉 ENTRY 72: VEDL @ 12:05 | BW: 0.007 (Limit: nan) | TIGHT
+👉 ENTRY 73: VOLTAS @ 11:05 | BW: 0.013 (Limit: nan) | TIGHT
+👉 ENTRY 74: ADANIENSOL @ 13:35 | BW: 0.003 (Limit: 0.003) | TIGHT
+👉 ENTRY 74: BHEL @ 12:10 | BW: 0.005 (Limit: 0.006) | TIGHT
+👉 ENTRY 75: KOTAKBANK @ 12:10 | BW: 0.003 (Limit: 0.003) | TIGHT
+👉 ENTRY 76: MCX @ 12:15 | BW: 0.003 (Limit: 0.003) | TIGHT
+👉 ENTRY 77: NTPC @ 13:00 | BW: 0.003 (Limit: 0.003) | TIGHT
+
+🏆 v4.1 RESULTS:
+   Trades: 77
+   Wins: 3
+   Losses: 74
+   Impulse Exits: 23
+   Net P&L (pts): -5.61%

@@ -137,6 +137,37 @@ if os.path.exists("scanner.log"):
 else:
     st.text("No logs yet.")
 
+# History Archive
+st.header("📜 History Archive")
+history_dir = "trade_history"
+if not os.path.exists(history_dir):
+    os.makedirs(history_dir)
+
+# Date Picker
+selected_date = st.date_input("Select Date", datetime.dates.today())
+date_str = selected_date.strftime("%Y-%m-%d")
+history_file = f"{history_dir}/trades_{date_str}.csv"
+
+if os.path.exists(history_file):
+    try:
+        hist_df = pd.read_csv(history_file)
+        st.dataframe(hist_df)
+        
+        # Daily Summary
+        if 'PnL' in hist_df.columns:
+            total_pnl = hist_df['PnL'].sum()
+            win_rate = (hist_df['PnL'] > 0).mean() * 100 if len(hist_df) > 0 else 0
+            
+            col1, col2, col3 = st.columns(3)
+            col1.metric("Daily Net P&L", f"₹{total_pnl:.2f}")
+            col2.metric("Trades", len(hist_df))
+            col3.metric("Win Rate", f"{win_rate:.0f}%")
+            
+    except Exception as e:
+        st.error(f"Error reading history: {e}")
+else:
+    st.info(f"No trade records found for {date_str}.")
+
 # Auto-Refresh
 time.sleep(5)
 st.rerun()
