@@ -244,46 +244,7 @@ class LiveBrain:
         reasons = []
         score = 0
         
-        # --- COMMON GATEKEEPERS ---
-        # 1. Structure (Price > SMA 50)
-        if trend_dist < 0:
-            reasons.append(f"BLOCKED: Below SMA 50 (Dist {trend_dist:.2f}%)")
-            return {
-                'strategies': [], 
-                'reasons': reasons, 
-                'score': 0, 
-                'signal_type': 'NEUTRAL',
-                'breakout_lvl': 0,
-                'breakdown_lvl': 0,
-                'edge': 0
-            }
-
-        # 2. VWAP Check
-        if vwap_value > 0 and price < vwap_value:
-             reasons.append(f"BLOCKED: Below VWAP ({price} < {vwap_value:.2f})")
-             return {
-                'strategies': [], 
-                'reasons': reasons, 
-                'score': 0, 
-                'signal_type': 'NEUTRAL',
-                'breakout_lvl': 0,
-                'breakdown_lvl': 0,
-                'edge': 0
-             }
-             
-        # 3. Green Candle Check
-        if open_price > 0 and price <= open_price:
-             reasons.append(f"BLOCKED: Red Candle")
-             return {
-                'strategies': [], 
-                'reasons': reasons, 
-                'score': 0, 
-                'signal_type': 'NEUTRAL',
-                'breakout_lvl': 0,
-                'breakdown_lvl': 0,
-                'edge': 0
-             }
-             
+        # --- GLOBAL FILTER (Applies to ALL) ---
         # 4. Filter Dead Zones (Low Volatility)
         if bandwidth < 0.03:
              reasons.append(f"BLOCKED: Dead Zone (BW {bandwidth:.3f} < 0.03)")
@@ -297,34 +258,67 @@ class LiveBrain:
                 'edge': 0
              }
 
-        # --- STRATEGY 1: THE SNIPER (v4.0) ---
-        # Strict Squeeze (< 0.15) + High Impact
-        is_sniper_squeeze = bandwidth < 0.15
-        is_sniper_vol = rvol > 1.5
-        
-        if is_sniper_squeeze and is_sniper_vol:
-            strategies_triggered.append("SNIPER")
-            reasons.append(f"🎯 SNIPER TRIGGER (BW {bandwidth:.2f}, RVOL {rvol:.1f})")
-            score = 90
+        # --- DETERMINISTIC BRANCHING ---
+        # Case A: Bullish Setup (Price > SMA 50)
+        if trend_dist > 0:
+            # Long Gatekeepers
+            if open_price > 0 and price <= open_price:
+                 reasons.append(f"BLOCKED: Red Candle (Bullish Trend)")
+                 return {'strategies': [], 'reasons': reasons, 'score': 0, 'signal_type': 'NEUTRAL', 'breakout_lvl':0, 'breakdown_lvl':0, 'edge':0}
+            
+            if vwap_value > 0 and price < vwap_value:
+                 reasons.append(f"BLOCKED: Below VWAP (Bullish Trend)")
+                 return {'strategies': [], 'reasons': reasons, 'score': 0, 'signal_type': 'NEUTRAL', 'breakout_lvl':0, 'breakdown_lvl':0, 'edge':0}
 
-        # --- STRATEGY 2: THE GAMMA (v4.2) ---
-        # Tiered Squeeze (< 0.20 for High Priced) + Structure
-        gamma_limit = 0.20 if price > 2000 else 0.15
-        is_gamma_squeeze = bandwidth < gamma_limit
-        # Note: Gamma also requires Green Candle & Structure (Already Checked)
-        # Gamma Trigger: Just needs Squeeze + Structure + Green Candle. RVOL specific not strict but highly recommended.
-        # Let's verify RVOL > 1.5 for Gamma too to avoid vacuum.
-        is_gamma_vol = rvol > 1.5
-        
-        if is_gamma_squeeze and is_gamma_vol:
-            # Check if likely already covered by Sniper
-            if "SNIPER" not in strategies_triggered:
+            # Long Strategies (Sniper + Gamma)
+            is_sniper_squeeze = bandwidth < 0.15
+            is_sniper_vol = rvol > 1.5
+            if is_sniper_squeeze and is_sniper_vol:
+                strategies_triggered.append("SNIPER")
+                reasons.append(f"🎯 SNIPER CALL (BW {bandwidth:.2f}, RVOL {rvol:.1f})")
+                score = 90
+                
+            gamma_limit = 0.20 if price > 2000 else 0.15
+            is_gamma_squeeze = bandwidth < gamma_limit
+            is_gamma_vol = rvol > 1.5
+            if is_gamma_squeeze and is_gamma_vol and "SNIPER" not in strategies_triggered:
                 strategies_triggered.append("GAMMA")
-                reasons.append(f"⚡ GAMMA TRIGGER (BW {bandwidth:.2f}, RVOL {rvol:.1f})")
+                reasons.append(f"⚡ GAMMA CALL (BW {bandwidth:.2f}, RVOL {rvol:.1f})")
                 score = max(score, 75)
-        
-        # --- RETURN RESULT ---
-        signal_type = "LONG" if strategies_triggered else "NEUTRAL"
+                
+            signal_type = "LONG" if strategies_triggered else "NEUTRAL"
+
+        # Case B: Bearish Setup (Price < SMA 50)
+        elif trend_dist < 0:
+            # Short Gatekeepers
+            if open_price > 0 and price >= open_price:
+                 reasons.append(f"BLOCKED: Green Candle (Bearish Trend)")
+                 return {'strategies': [], 'reasons': reasons, 'score': 0, 'signal_type': 'NEUTRAL', 'breakout_lvl':0, 'breakdown_lvl':0, 'edge':0}
+            
+            if vwap_value > 0 and price > vwap_value:
+                 reasons.append(f"BLOCKED: Above VWAP (Bearish Trend)")
+                 return {'strategies': [], 'reasons': reasons, 'score': 0, 'signal_type': 'NEUTRAL', 'breakout_lvl':0, 'breakdown_lvl':0, 'edge':0}
+
+            # Short Strategies (Sniper + Gamma)
+            is_sniper_squeeze = bandwidth < 0.15
+            is_sniper_vol = rvol > 1.5
+            if is_sniper_squeeze and is_sniper_vol:
+                strategies_triggered.append("SNIPER")
+                reasons.append(f"🎯 SNIPER PUT (BW {bandwidth:.2f}, RVOL {rvol:.1f})")
+                score = 90
+                
+            gamma_limit = 0.20 if price > 2000 else 0.15
+            is_gamma_squeeze = bandwidth < gamma_limit
+            is_gamma_vol = rvol > 1.5
+            if is_gamma_squeeze and is_gamma_vol and "SNIPER" not in strategies_triggered:
+                strategies_triggered.append("GAMMA")
+                reasons.append(f"⚡ GAMMA PUT (BW {bandwidth:.2f}, RVOL {rvol:.1f})")
+                score = max(score, 75)
+                
+            signal_type = "SHORT" if strategies_triggered else "NEUTRAL"
+            
+        else:
+            signal_type = "NEUTRAL"
         
         return {
             "strategies": strategies_triggered,
