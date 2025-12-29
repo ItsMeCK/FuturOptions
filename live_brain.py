@@ -245,8 +245,11 @@ class LiveBrain:
         score = 0
         
         # --- GLOBAL FILTER (Applies to ALL) ---
-        if bandwidth < 0.005:
-             reasons.append(f"BLOCKED: Dead Zone (BW {bandwidth:.3f} < 0.005)")
+        # v14.3 Tuning: Dynamic Dead Zone
+        dead_zone_limit = 0.005 if price > 500 else 0.02
+        
+        if bandwidth < dead_zone_limit:
+             reasons.append(f"BLOCKED: Dead Zone (BW {bandwidth:.3f} < {dead_zone_limit})")
              return {
                 'strategies': [], 
                 'reasons': reasons, 

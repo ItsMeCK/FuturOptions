@@ -130,8 +130,13 @@ def simulate_today():
                 # --- v14.0 SIMULATION LOGIC (Dual Engine) ---
                 
                 # 0. Global Filters (Safety)
-                if ts.time() < datetime.strptime("09:30", "%H:%M").time(): continue # Time Filter
-                if curr_bw < 0.005: continue # Dead Zone Filter (v14.2: 0.5% for Large Caps)
+                # v14.3 Tuning: Dynamic Dead Zone
+                # Large Caps (> 500 INR) need sensitive 0.5% BW.
+                # Small Caps (< 500 INR) need strict 2.0% BW to avoid chop.
+                params_dead_zone = 0.005 if price > 500 else 0.02
+                
+                if ts.time() < datetime.strptime("09:30", "%H:%M").time(): continue 
+                if curr_bw < params_dead_zone: continue
                 
                 strategy = None
                 signal_type = None
