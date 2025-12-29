@@ -283,20 +283,24 @@ class LiveBrain:
                  return {'strategies': [], 'reasons': reasons, 'score': 0, 'signal_type': 'NEUTRAL', 'breakout_lvl':0, 'breakdown_lvl':0, 'edge':0}
 
             # Long Strategies (Sniper + Gamma)
+            # v14.7: Aggressive Volume Filter (Global > 2.2, Tight > 3.0)
+            rvol_req = 3.0 if bandwidth < 0.01 else 2.2
             is_sniper_squeeze = bandwidth < 0.15
-            is_sniper_vol = rvol > 1.5
+            is_sniper_vol = rvol > rvol_req
             if is_sniper_squeeze and is_sniper_vol:
                 strategies_triggered.append("SNIPER")
                 reasons.append(f"🎯 SNIPER CALL (BW {bandwidth:.2f}, RVOL {rvol:.1f})")
                 score = 90
                 
-            gamma_limit = 0.20 if price > 2000 else 0.15
-            is_gamma_squeeze = bandwidth < gamma_limit
-            is_gamma_vol = rvol > 1.5
-            if is_gamma_squeeze and is_gamma_vol and "SNIPER" not in strategies_triggered:
-                strategies_triggered.append("GAMMA")
-                reasons.append(f"⚡ GAMMA CALL (BW {bandwidth:.2f}, RVOL {rvol:.1f})")
-                score = max(score, 75)
+            # Gamma (Secondary) - Floor > 1% BW
+            if "SNIPER" not in strategies_triggered and bandwidth > 0.01:
+                gamma_limit = 0.20 if price > 2000 else 0.15
+                is_gamma_squeeze = bandwidth < gamma_limit
+                is_gamma_vol = rvol > 2.2
+                if is_gamma_squeeze and is_gamma_vol:
+                    strategies_triggered.append("GAMMA")
+                    reasons.append(f"⚡ GAMMA CALL (BW {bandwidth:.2f}, RVOL {rvol:.1f})")
+                    score = max(score, 75)
                 
             signal_type = "LONG" if strategies_triggered else "NEUTRAL"
 
@@ -312,20 +316,24 @@ class LiveBrain:
                  return {'strategies': [], 'reasons': reasons, 'score': 0, 'signal_type': 'NEUTRAL', 'breakout_lvl':0, 'breakdown_lvl':0, 'edge':0}
 
             # Short Strategies (Sniper + Gamma)
+            # v14.7: Aggressive Volume Filter
+            rvol_req = 3.0 if bandwidth < 0.01 else 2.2
             is_sniper_squeeze = bandwidth < 0.15
-            is_sniper_vol = rvol > 1.5
+            is_sniper_vol = rvol > rvol_req
             if is_sniper_squeeze and is_sniper_vol:
                 strategies_triggered.append("SNIPER")
                 reasons.append(f"🎯 SNIPER PUT (BW {bandwidth:.2f}, RVOL {rvol:.1f})")
                 score = 90
                 
-            gamma_limit = 0.20 if price > 2000 else 0.15
-            is_gamma_squeeze = bandwidth < gamma_limit
-            is_gamma_vol = rvol > 1.5
-            if is_gamma_squeeze and is_gamma_vol and "SNIPER" not in strategies_triggered:
-                strategies_triggered.append("GAMMA")
-                reasons.append(f"⚡ GAMMA PUT (BW {bandwidth:.2f}, RVOL {rvol:.1f})")
-                score = max(score, 75)
+            # Gamma (Secondary) - Floor > 1% BW
+            if "SNIPER" not in strategies_triggered and bandwidth > 0.01:
+                gamma_limit = 0.20 if price > 2000 else 0.15
+                is_gamma_squeeze = bandwidth < gamma_limit
+                is_gamma_vol = rvol > 2.2
+                if is_gamma_squeeze and is_gamma_vol:
+                    strategies_triggered.append("GAMMA")
+                    reasons.append(f"⚡ GAMMA PUT (BW {bandwidth:.2f}, RVOL {rvol:.1f})")
+                    score = max(score, 75)
                 
             signal_type = "SHORT" if strategies_triggered else "NEUTRAL"
             

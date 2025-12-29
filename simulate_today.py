@@ -156,14 +156,16 @@ def simulate_today():
                     
                     # Long Strategies
                     # Sniper
-                    if (curr_bw < 0.15) and (curr_rvol > 1.5):
+                    # Sniper (v14.7 Final Institutional)
+                    rvol_req = 3.0 if curr_bw < 0.01 else 2.2
+                    if (curr_bw < 0.15) and (curr_rvol > rvol_req):
                         strategy = "SNIPER"
                         signal_type = "CE"
                     
-                    # Gamma (Secondary)
-                    elif strategy is None:
+                    # Gamma (Secondary) - v14.5: Disable Gamma for Tight Squeezes (Use Sniper Only)
+                    elif strategy is None and curr_bw > 0.01:
                         gamma_limit = 0.20 if price > 2000 else 0.15
-                        if (curr_bw < gamma_limit) and (curr_rvol > 1.5): 
+                        if (curr_bw < gamma_limit) and (curr_rvol > 2.2): 
                              strategy = "GAMMA"
                              signal_type = "CE"
                              
@@ -174,12 +176,14 @@ def simulate_today():
                      if curr_vwap > 0 and price > curr_vwap: continue 
                      
                      # Short Strategies
-                     if (curr_bw < 0.15) and (curr_rvol > 1.5):
+                     # Sniper (v14.7 Final Institutional)
+                     rvol_req = 3.0 if curr_bw < 0.01 else 2.2
+                     if (curr_bw < 0.15) and (curr_rvol > rvol_req):
                         strategy = "SNIPER"
                         signal_type = "PE"
-                     elif strategy is None:
+                     elif strategy is None and curr_bw > 0.01:
                         gamma_limit = 0.20 if price > 2000 else 0.15
-                        if (curr_bw < gamma_limit) and (curr_rvol > 1.5):
+                        if (curr_bw < gamma_limit) and (curr_rvol > 2.2):
                             strategy = "GAMMA"
                             signal_type = "PE"
                             
