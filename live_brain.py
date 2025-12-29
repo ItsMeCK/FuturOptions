@@ -532,6 +532,7 @@ class LiveBrain:
             edge = 0.0
             breakout_lvl = 0.0
             breakdown_lvl = 0.0
+            focus_data = None # v10.3 Hotfix
             
             llm_conf = "-"
             llm_decision = "-"
