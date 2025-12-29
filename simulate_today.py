@@ -55,21 +55,34 @@ def simulate_today():
         # if count > 50: break # Safety limit for speed if needed
         
         try:
-            # Get Token
-            inst_token = fetcher.get_instrument_token(symbol)
-            if not inst_token:
-                # print(f"Skipping {symbol} (No Token)")
-                continue
-                
-            # Fetch Data (5 Days)
-            hist_df = fetcher.fetch_latest_data(inst_token, days=5, interval="5minute")
+            # CACHE LOGIC
+            cache_file = f"sim_cache/{symbol}_dec29.csv"
             
-            if hist_df is None or hist_df.empty:
-                continue
+            if os.path.exists(cache_file):
+                # print(f"📂 Loading {symbol} from cache...")
+                hist_df = pd.read_csv(cache_file)
+                if 'date' in hist_df.columns:
+                    hist_df['date'] = pd.to_datetime(hist_df['date'])
+                    hist_df.set_index('date', inplace=True)
+            else:
+                # Get Token
+                inst_token = fetcher.get_instrument_token(symbol)
+                if not inst_token:
+                    continue
+                    
+                # Fetch Data (5 Days)
+                hist_df = fetcher.fetch_latest_data(inst_token, days=5, interval="5minute")
                 
-            if 'date' in hist_df.columns:
-                hist_df['date'] = pd.to_datetime(hist_df['date'])
-                hist_df.set_index('date', inplace=True)
+                if hist_df is None or hist_df.empty:
+                    continue
+                    
+                if 'date' in hist_df.columns:
+                    hist_df['date'] = pd.to_datetime(hist_df['date'])
+                    hist_df.set_index('date', inplace=True)
+                    
+                # Save to Cache
+                if not os.path.exists("sim_cache"): os.makedirs("sim_cache")
+                hist_df.to_csv(cache_file)
                 
             # Features
             hist_df['log_ret'] = np.log(hist_df['close'] / hist_df['close'].shift(1))
@@ -95,13 +108,20 @@ def simulate_today():
             today_mask = hist_df.index.strftime('%Y-%m-%d') == today_str
             indices = hist_df.index[today_mask]
             
+            if "HFCL" in symbol:
+                 print(f"🧐 HFCL Data Loaded: {len(indices)} candles for {today_str}")
+            
             if len(indices) == 0:
                  # print(f"No Data Dec 29 for {symbol}")
                  continue
-                 
-            # print(f"Analyzing {symbol} ({len(indices)} candles)...")
             
             for ts in indices:
+                # DEBUG HFCL
+                if "HFCL" in symbol:
+                     # Get scalar preview
+                     _bw = bw_series.loc[ts]
+                     print(f"🧐 HFCL RAW: {ts.time()} BW={_bw:.4f}")
+
                 # Get scalar values at this timestamp
                 price = hist_df.loc[ts]['close']
                 open_p = hist_df.loc[ts]['open']
@@ -114,59 +134,93 @@ def simulate_today():
                 curr_vwap = vwap_series.loc[ts]
                 
                 # Logic (Exact Copy)
-                trend_dist = (price - curr_sma)/curr_sma if pd.notna(curr_sma) else 0
+                if pd.notna(curr_sma):
+                    trend_dist = (price - curr_sma)/curr_sma
+                else:
+                    # Fallback: Use VWAP for trend if SMA50 is not ready (Cold Start)
+                    trend_dist = (price - curr_vwap)/curr_vwap if curr_vwap > 0 else 0
                 
-                # Filter 1: Structure
-                if trend_dist < 0: continue
-                # Filter 2: VWAP
-                if curr_vwap > 0 and price < curr_vwap: continue
-                # Filter 3: Red Candle
-                if open_p > 0 and price <= open_p: continue
+                # --- v14.0 SIMULATION LOGIC (Dual Engine) ---
                 
-                # SNIPER
-                is_st = False
-                is_sniper_squeeze = curr_bw < 0.15
-                is_sniper_vol = curr_rvol > 1.5
+                # 0. Global Filters (Safety)
+                if ts.time() < datetime.strptime("09:30", "%H:%M").time(): continue # Time Filter
+                if curr_bw < 0.03: continue # Dead Zone Filter
                 
-                if is_sniper_squeeze and is_sniper_vol:
-                    is_st = True
-                    strategy = "SNIPER"
+                strategy = None
+                signal_type = None
+                
+                # Branch A: Bullish (Price > SMA)
+                if "HFCL" in symbol:
+                     print(f"🧐 HFCL Check: Time={ts.time()} Price={price} SMA={curr_sma} TrendDist={trend_dist}")
+
+                if trend_dist > 0:
+                    # Long Gatekeepers
+                    if open_p > 0 and price <= open_p: 
+                        if "HFCL" in symbol: print(f"🛑 HFCL BLOCKED: Red Candle (Price {price} <= Open {open_p})")
+                        continue
+                    if curr_vwap > 0 and price < curr_vwap: 
+                        if "HFCL" in symbol: print(f"🛑 HFCL BLOCKED: Below VWAP ({price} < {curr_vwap:.2f})")
+                        continue
                     
-                # GAMMA
-                gamma_limit = 0.20 if price > 2000 else 0.15
-                is_gamma_squeeze = curr_bw < gamma_limit
-                is_gamma_vol = curr_rvol > 1.5
-                
-                if is_gamma_squeeze and is_gamma_vol and not is_st:
-                    is_st = True
-                    strategy = "GAMMA"
+                    # Long Strategies
+                    # Sniper
+                    if (curr_bw < 0.15) and (curr_rvol > 1.5):
+                        strategy = "SNIPER"
+                        signal_type = "CE"
                     
-                if is_st:
+                    # Gamma (Secondary)
+                    elif strategy is None:
+                        gamma_limit = 0.20 if price > 2000 else 0.15
+                        if (curr_bw < gamma_limit) and (curr_rvol > 1.5): 
+                             strategy = "GAMMA"
+                             signal_type = "CE"
+                             
+                elif trend_dist < 0:
+                     if "HFCL" in symbol: print(f"🛑 HFCL BLOCKED: Below SMA 50 (TrendDist {trend_dist:.2f}%)")
+                     # Short Gatekeepers
+                     if open_p > 0 and price >= open_p: continue 
+                     if curr_vwap > 0 and price > curr_vwap: continue 
+                     
+                     # Short Strategies
+                     if (curr_bw < 0.15) and (curr_rvol > 1.5):
+                        strategy = "SNIPER"
+                        signal_type = "PE"
+                     elif strategy is None:
+                        gamma_limit = 0.20 if price > 2000 else 0.15
+                        if (curr_bw < gamma_limit) and (curr_rvol > 1.5):
+                            strategy = "GAMMA"
+                            signal_type = "PE"
+                            
+                else: 
+                     if "HFCL" in symbol: print(f"🛑 HFCL NEUTRAL: TrendDist is 0 or NaN.")
+
+                if strategy:
                     # Log Signal
-                    # Check if duplicated (already signaled recently?)
-                    # For simulation, we log ALL triggers to see freq
-                    
                     signals.append({
                         "Time": ts.strftime("%H:%M:%S"),
                         "Symbol": symbol,
                         "Strategy": strategy,
+                        "Type": signal_type,
                         "Price": price,
                         "BW": round(curr_bw, 3),
                         "RVOL": round(curr_rvol, 1),
                         "VWAP_Dist": round((price-curr_vwap)/curr_vwap*100, 2)
                     })
-                    print(f"🚨 {symbol} {strategy} @ {ts.time()} | BW:{curr_bw:.2f} RV:{curr_rvol:.1f}")
+                    print(f"🚨 {symbol} {strategy} ({signal_type}) @ {ts.time()} | BW:{curr_bw:.2f} RV:{curr_rvol:.1f}")
 
         except Exception as e:
-            # print(f"Err {symbol}: {e}")
+            print(f"🛑 Err {symbol}: {e}")
+            import traceback
+            traceback.print_exc()
             pass
             
     # Save
     if signals:
         df = pd.DataFrame(signals)
-        print(df)
-        df.to_csv("sim_dec29.csv", index=False)
-        print(f"✅ Saved {len(df)} signals to sim_dec29.csv")
+        print("\n--- FINAL SIMULATION REPORT (Dec 29) ---")
+        print(df.to_string(index=False))
+        df.to_csv("sim_dec29_dual.csv", index=False)
+        print(f"✅ Saved {len(df)} signals to sim_dec29_dual.csv")
     else:
         print("No Signals Found.")
 

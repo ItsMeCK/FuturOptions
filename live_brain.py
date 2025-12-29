@@ -258,9 +258,19 @@ class LiveBrain:
                 'edge': 0
              }
 
+        # --- v14.1: ROBUST TREND CALCULATION ---
+        # If SMA is available, use it. If not (Cold Start), use VWAP.
+        # This prevents blocking valid morning trades when history is loading.
+        # Note: 'trend_dist' variable name is legacy but conceptually fits.
+        if trend_dist == 0 and vwap_dist != 0:
+             # Fallback to VWAP trend if SMA trend is 0 (likely NaN/Insuffcient Data)
+             effective_trend = vwap_dist
+        else:
+             effective_trend = trend_dist
+
         # --- DETERMINISTIC BRANCHING ---
-        # Case A: Bullish Setup (Price > SMA 50)
-        if trend_dist > 0:
+        # Case A: Bullish Setup (Price > SMA or Price > VWAP)
+        if effective_trend > 0:
             # Long Gatekeepers
             if open_price > 0 and price <= open_price:
                  reasons.append(f"BLOCKED: Red Candle (Bullish Trend)")
@@ -288,8 +298,8 @@ class LiveBrain:
                 
             signal_type = "LONG" if strategies_triggered else "NEUTRAL"
 
-        # Case B: Bearish Setup (Price < SMA 50)
-        elif trend_dist < 0:
+        # Case B: Bearish Setup (Price < SMA or Price < VWAP)
+        elif effective_trend < 0:
             # Short Gatekeepers
             if open_price > 0 and price >= open_price:
                  reasons.append(f"BLOCKED: Green Candle (Bearish Trend)")
