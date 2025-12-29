@@ -248,17 +248,41 @@ class LiveBrain:
         # 1. Structure (Price > SMA 50)
         if trend_dist < 0:
             reasons.append(f"BLOCKED: Below SMA 50 (Dist {trend_dist:.2f}%)")
-            return {'strategies': [], 'reasons': reasons, 'score': 0, 'signal_type': 'NEUTRAL'}
+            return {
+                'strategies': [], 
+                'reasons': reasons, 
+                'score': 0, 
+                'signal_type': 'NEUTRAL',
+                'breakout_lvl': 0,
+                'breakdown_lvl': 0,
+                'edge': 0
+            }
 
         # 2. VWAP Check
         if vwap_value > 0 and price < vwap_value:
              reasons.append(f"BLOCKED: Below VWAP ({price} < {vwap_value:.2f})")
-             return {'strategies': [], 'reasons': reasons, 'score': 0, 'signal_type': 'NEUTRAL'}
+             return {
+                'strategies': [], 
+                'reasons': reasons, 
+                'score': 0, 
+                'signal_type': 'NEUTRAL',
+                'breakout_lvl': 0,
+                'breakdown_lvl': 0,
+                'edge': 0
+             }
              
         # 3. Green Candle Check
         if open_price > 0 and price <= open_price:
              reasons.append(f"BLOCKED: Red Candle")
-             return {'strategies': [], 'reasons': reasons, 'score': 0, 'signal_type': 'NEUTRAL'}
+             return {
+                'strategies': [], 
+                'reasons': reasons, 
+                'score': 0, 
+                'signal_type': 'NEUTRAL',
+                'breakout_lvl': 0,
+                'breakdown_lvl': 0,
+                'edge': 0
+             }
 
         # --- STRATEGY 1: THE SNIPER (v4.0) ---
         # Strict Squeeze (< 0.15) + High Impact
@@ -295,6 +319,7 @@ class LiveBrain:
             "score": score,
             "signal_type": signal_type,
             "breakout_lvl": 0, # Legacy support
+            "breakdown_lvl": 0, # Legacy support
             "edge": 0 # Legacy support
         }
 
